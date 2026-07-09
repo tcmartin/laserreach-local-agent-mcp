@@ -1,0 +1,32 @@
+{
+  "name": "laserreach-local-agent-mcp",
+  "version": "0.1.0",
+  "description": "Local MCP server, webhook receiver, and cron runner for Laserreach external-agent tokens.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "laserreach-local-agent": "./src/cli.js"
+  },
+  "files": [
+    "src",
+    "examples",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "start:mcp": "node src/cli.js mcp",
+    "start:serve": "node src/cli.js serve",
+    "capabilities": "node src/cli.js capabilities"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.18.0",
+    "node-cron": "^4.2.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {}
+}

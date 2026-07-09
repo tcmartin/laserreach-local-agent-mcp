@@ -1,0 +1,36 @@
+{
+  "host": "127.0.0.1",
+  "port": 8797,
+  "webhooks": [
+    {
+      "event": "signal.created",
+      "name": "Send event to local Codex",
+      "command": "codex",
+      "args": ["exec", "--skip-git-repo-check"],
+      "template": "Use Laserreach APIs to inspect this event and propose next actions. Event: {{json}}"
+    }
+  ],
+  "jobs": [
+    {
+      "name": "Score pending signals every 30 minutes",
+      "cron": "*/30 * * * *",
+      "request": {
+        "method": "POST",
+        "path": "/api/abm/signals/score-pending",
+        "body": { "limit": 25 }
+      }
+    },
+    {
+      "name": "Ask Codex to review new signals hourly",
+      "cron": "0 * * * *",
+      "request": {
+        "method": "GET",
+        "path": "/api/abm/signals",
+        "query": { "status": "NEW", "limit": "20" }
+      },
+      "command": "codex",
+      "args": ["exec", "--skip-git-repo-check"],
+      "template": "Review these Laserreach signals and recommend next actions. API result: {{result}}"
+    }
+  ]
+}
