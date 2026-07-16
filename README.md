@@ -87,7 +87,25 @@ See [docs/claude-desktop.md](docs/claude-desktop.md) for the full setup.
 - `laserreach_list_targets`: list companies or people.
 - `laserreach_list_senders`: list LinkedIn/email sender connections.
 - `laserreach_prepare_messages`: prepare outreach messages for review.
+- `laserreach_sync_hubspot_outreach`: log local-agent outreach to HubSpot. Use `dry_run: true` first.
 - `laserreach_request`: generic scoped request for advanced use.
+
+## HubSpot Outreach Sync
+
+When your local agent sends or stages outreach outside Laserreach-hosted runs, call:
+
+```json
+{
+  "dry_run": true,
+  "event_id": "local-demo-1",
+  "company_id": "company_123",
+  "person_id": "person_456",
+  "channel": "email",
+  "message": "Short message body or summary"
+}
+```
+
+After the dry run returns the planned Company, Contact, Deal, and Note, call again with `dry_run: false` or omit it. Laserreach creates or updates the HubSpot records, associates them, writes one note, and records sync failures in the account.
 
 ## Webhook Receiver And Cron Runner
 

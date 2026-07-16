@@ -62,3 +62,42 @@ test("LaserreachClient includes JSON bodies and reports API errors", async () =>
     await api.close();
   }
 });
+
+test("LaserreachClient syncs local outreach to HubSpot endpoint", async () => {
+  const api = await startMockApi(async (req, res) => {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    assert.equal(req.method, "POST");
+    assert.equal(req.url, "/api/abm/crm/hubspot/outreach-sync");
+    assert.equal(req.headers.authorization, "Bearer tok_test");
+    assert.equal(req.headers["x-org-id"], "org_test");
+    assert.deepEqual(JSON.parse(body), {
+      dry_run: true,
+      company_id: "company_1",
+      person_id: "person_1",
+      channel: "email",
+      message: "Local agent drafted this.",
+    });
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ ok: true, dry_run: true }));
+  });
+  try {
+    const client = new LaserreachClient({
+      apiBase: api.url,
+      orgId: "org_test",
+      token: "tok_test",
+    });
+    assert.deepEqual(
+      await client.syncHubspotOutreach({
+        dry_run: true,
+        company_id: "company_1",
+        person_id: "person_1",
+        channel: "email",
+        message: "Local agent drafted this.",
+      }),
+      { ok: true, dry_run: true },
+    );
+  } finally {
+    await api.close();
+  }
+});

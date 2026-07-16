@@ -46,6 +46,7 @@ test("MCP server lists tools and calls capabilities", async () => {
     const tools = await client.listTools();
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_capabilities"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_list_signals"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_sync_hubspot_outreach"));
     const result = await client.callTool({ name: "laserreach_capabilities", arguments: {} });
     assert.match(result.content[0].text, /local_execution/);
   } finally {

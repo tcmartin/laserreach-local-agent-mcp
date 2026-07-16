@@ -110,4 +110,8 @@ export class LaserreachClient {
   prepareMessages(body = {}) {
     return this.request({ method: "POST", path: "/api/abm/sequences/prepare-messages", body });
   }
+
+  syncHubspotOutreach(body = {}) {
+    return this.request({ method: "POST", path: "/api/abm/crm/hubspot/outreach-sync", body });
+  }
 }

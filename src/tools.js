@@ -183,6 +183,35 @@ export function registerLaserreachTools(server, client) {
   );
 
   server.registerTool(
+    "laserreach_sync_hubspot_outreach",
+    {
+      title: "Sync outreach to HubSpot",
+      description: "Log local-agent outreach activity to HubSpot through Laserreach. Start with dry_run=true during setup.",
+      inputSchema: {
+        dry_run: z.boolean().optional(),
+        event_id: z.string().optional(),
+        pipeline_id: z.string().optional(),
+        sequence_id: z.string().optional(),
+        campaign_id: z.string().optional(),
+        signal_id: z.string().optional(),
+        person_id: z.string().optional(),
+        company_id: z.string().optional(),
+        channel: z.enum(["email", "linkedin", "phone", "other"]).optional(),
+        message: z.string().optional(),
+        contact_name: z.string().optional(),
+        contact_email: z.string().optional(),
+        contact_title: z.string().optional(),
+        company_name: z.string().optional(),
+        company_domain: z.string().optional(),
+        company_website: z.string().optional(),
+        deal_name: z.string().optional(),
+        note_body: z.string().optional(),
+      },
+    },
+    async (body) => wrap(() => client.syncHubspotOutreach(body)),
+  );
+
+  server.registerTool(
     "laserreach_request",
     {
       title: "Generic Laserreach request",
