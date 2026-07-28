@@ -79,40 +79,103 @@ export function registerLaserreachTools(server, client) {
     "laserreach_list_signals",
     {
       title: "List Laserreach signals",
-      description: "List current buyer signals. Use filters from capabilities when available.",
+      description: "List buyer signals. Defaults to ICP-matched, scored signals; choose raw only when broad collection data is needed.",
       inputSchema: {
         status: z.string().optional(),
         source_id: z.string().optional(),
-        company_id: z.string().optional(),
-        limit: z.number().int().positive().max(200).optional(),
+        signal_type: z.string().optional(),
+        quality: z.enum(["actionable", "raw"]).default("actionable"),
+        min_score: z.number().min(0).max(1).optional(),
+        limit: z.number().int().positive().max(100).optional(),
       },
     },
-    async (args) => wrap(() => client.listSignals(args)),
+    async ({ quality, ...args }) => wrap(() => client.listSignals({
+      ...args,
+      ...(quality === "actionable" ? {
+        require_icp_match: true,
+        min_score: args.min_score ?? 0.5,
+      } : {}),
+    })),
   );
 
   server.registerTool(
-    "laserreach_score_pending_signals",
+    "laserreach_assess_signal",
     {
-      title: "Score pending signals",
-      description: "Ask Laserreach to score pending signals. This uses Laserreach processing, not hosted agent runs.",
+      title: "Store local signal assessment",
+      description: "Save fit and intent scores produced by this local agent. This does not call a Laserreach-hosted model.",
       inputSchema: {
-        limit: z.number().int().positive().max(200).optional(),
+        signal_id: z.string().min(1),
+        intent_score: z.number().min(0).max(1),
+        relevance_score: z.number().min(0).max(1),
+        icp_match: z.boolean(),
+        matched_icp_id: z.string().optional(),
+        matched_icp_name: z.string().optional(),
+        stage_classification: z.string().optional(),
+        reasoning: z.string().min(1).max(2000),
       },
     },
-    async (args) => wrap(() => client.scorePendingSignals(args)),
+    async ({ signal_id, ...body }) => wrap(() => client.assessSignal(signal_id, body)),
   );
 
   server.registerTool(
-    "laserreach_process_signals",
+    "laserreach_resolve_signal_contact",
     {
-      title: "Process signals",
-      description: "Ask Laserreach to process queued signals.",
+      title: "Attach signal contact",
+      description: "Attach an existing same-company Laserreach person to a signal, including job-posting signals.",
       inputSchema: {
-        source_id: z.string().optional(),
-        limit: z.number().int().positive().max(200).optional(),
+        signal_id: z.string().min(1),
+        person_id: z.string().min(1),
       },
     },
-    async (args) => wrap(() => client.processSignals(args)),
+    async ({ signal_id, person_id }) => wrap(
+      () => client.resolveSignalContact(signal_id, person_id),
+    ),
+  );
+
+  server.registerTool(
+    "laserreach_list_icps",
+    {
+      title: "List ICPs",
+      description: "List Laserreach ICP definitions and their current status.",
+      inputSchema: {
+        status: z.enum(["active", "inactive", "draft"]).optional(),
+      },
+    },
+    async (args) => wrap(() => client.listIcps(args)),
+  );
+
+  server.registerTool(
+    "laserreach_manage_icp",
+    {
+      title: "Manage ICP",
+      description: "Create, update, or delete a Laserreach ICP. For create, include the complete ICP definition.",
+      inputSchema: {
+        action: z.enum(["create", "update", "delete"]),
+        icp_id: z.string().optional(),
+        icp: z.record(z.any()).optional(),
+      },
+    },
+    async ({ action, icp_id, icp = {} }) => wrap(() => {
+      if (action === "create") return client.createIcp(icp);
+      if (!icp_id) throw new Error("icp_id is required for update or delete");
+      if (action === "delete") return client.deleteIcp(icp_id);
+      return client.updateIcp(icp_id, icp);
+    }),
+  );
+
+  server.registerTool(
+    "laserreach_refresh_icps",
+    {
+      title: "Refresh ICP scoring",
+      description: "Reapply deterministic ICP rules without using a Laserreach-hosted model.",
+      inputSchema: {
+        icp_id: z.string().optional(),
+        limit: z.number().int().positive().max(500).default(500),
+      },
+    },
+    async ({ icp_id = "", limit }) => wrap(
+      () => client.refreshIcps({ limit }, icp_id),
+    ),
   );
 
   server.registerTool(
@@ -168,21 +231,6 @@ export function registerLaserreachTools(server, client) {
   );
 
   server.registerTool(
-    "laserreach_prepare_messages",
-    {
-      title: "Prepare messages",
-      description: "Prepare outreach messages for review. This stages work; sending still follows Laserreach scopes and policy.",
-      inputSchema: {
-        sequence_id: z.string().optional(),
-        company_id: z.string().optional(),
-        person_ids: z.array(z.string()).optional(),
-        context: z.record(z.any()).optional(),
-      },
-    },
-    async (body) => wrap(() => client.prepareMessages(body)),
-  );
-
-  server.registerTool(
     "laserreach_sync_hubspot_outreach",
     {
       title: "Sync outreach to HubSpot",
@@ -212,10 +260,38 @@ export function registerLaserreachTools(server, client) {
   );
 
   server.registerTool(
+    "laserreach_start_sequence",
+    {
+      title: "Start governed sequence",
+      description: "Start an existing sequence using customer-local copy. Requires outreach:send and Laserreach policy approval; never starts a hosted agent run.",
+      inputSchema: {
+        sequence_id: z.string().min(1),
+        confirm_outbound: z.literal(true),
+        options: z.record(z.any()).optional(),
+      },
+    },
+    async ({ sequence_id, options = {} }) => wrap(
+      () => client.startSequence(sequence_id, options),
+    ),
+  );
+
+  server.registerTool(
+    "laserreach_revoke_self",
+    {
+      title: "Revoke this agent token",
+      description: "Immediate kill switch for the currently configured token. The token cannot be used after this succeeds.",
+      inputSchema: {
+        confirm: z.literal("REVOKE"),
+      },
+    },
+    async () => wrap(() => client.revokeSelf()),
+  );
+
+  server.registerTool(
     "laserreach_request",
     {
       title: "Generic Laserreach request",
-      description: "Advanced scoped request. Avoid /api/abm/agent-runs mutation unless the user explicitly requests hosted run control and the token has agent-runs:control.",
+      description: "Advanced scoped request. Do not mutate /api/abm/agent-runs or call Laserreach model-backed signal processing unless the user explicitly requests it.",
       inputSchema: {
         method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).default("GET"),
         path: z.string().min(1),

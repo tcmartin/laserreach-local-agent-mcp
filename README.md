@@ -31,7 +31,9 @@ npm link
 3. Go to **Settings > External Agents**.
 4. Create a token for Claude Cowork, Codex, or your local agent.
 5. Keep **Laserreach-hosted run control** off for normal local-agent use.
-6. Copy the one-time setup block.
+6. Enable **Outbound send** only when this agent should start governed
+   sequences. This does not enable hosted runs.
+7. Copy the one-time setup block.
 
 Set these environment variables:
 
@@ -146,16 +148,41 @@ See [docs/claude-desktop.md](docs/claude-desktop.md) for the full setup.
 - `laserreach_capabilities`: fetch the live capability catalog.
 - `laserreach_list_sources`: list signal sources.
 - `laserreach_collect_source`: trigger collection for one source.
-- `laserreach_list_signals`: list current signals.
-- `laserreach_score_pending_signals`: ask Laserreach to score pending signals.
-- `laserreach_process_signals`: ask Laserreach to process signal backlog.
+- `laserreach_list_signals`: list ICP-matched signals by default, or request the
+  raw feed.
+- `laserreach_assess_signal`: store scoring produced by the local agent.
+- `laserreach_resolve_signal_contact`: attach a real same-company person to a
+  signal.
+- `laserreach_list_icps`: list ICP definitions.
+- `laserreach_manage_icp`: create, update, or delete an ICP.
+- `laserreach_refresh_icps`: reapply deterministic ICP rules without a hosted
+  model.
 - `laserreach_approve_signal`: approve a signal.
 - `laserreach_dismiss_signal`: dismiss a signal.
 - `laserreach_list_targets`: list companies or people.
 - `laserreach_list_senders`: list LinkedIn/email sender connections.
-- `laserreach_prepare_messages`: prepare outreach messages for review.
+- `laserreach_start_sequence`: start a governed sequence when the token has
+  `outreach:send`.
 - `laserreach_sync_hubspot_outreach`: log local-agent outreach to HubSpot. Use `dry_run: true` first.
+- `laserreach_revoke_self`: permanently revoke the current token.
 - `laserreach_request`: generic scoped request for advanced use.
+
+The normal MCP tools do not call Laserreach-hosted signal scoring or agent
+runs. The local Claude, Codex, or other MCP client performs reasoning and stores
+its result with `laserreach_assess_signal`.
+
+## ICP And Signal Workflow
+
+1. Call `laserreach_list_icps`.
+2. Call `laserreach_refresh_icps` after an ICP changes, or run the generated
+   daily refresh schedule.
+3. Call `laserreach_list_signals` with `quality: "raw"` when the local agent
+   needs to assess new collection data.
+4. Call `laserreach_assess_signal` with scores, ICP match, and reasoning.
+5. Call `laserreach_list_signals` with the default `quality: "actionable"` for
+   the filtered working queue.
+6. For a job signal, find or create a real person and call
+   `laserreach_resolve_signal_contact`.
 
 ## HubSpot Outreach Sync
 
@@ -233,12 +260,12 @@ https://<your-tunnel-host>/webhooks/<event_type>
   ],
   "jobs": [
     {
-      "name": "Score pending signals every 30 minutes",
-      "cron": "*/30 * * * *",
+      "name": "Refresh deterministic ICP scoring daily",
+      "cron": "15 3 * * *",
       "request": {
         "method": "POST",
-        "path": "/api/abm/signals/score-pending",
-        "body": { "limit": 25 }
+        "path": "/api/abm/icps/refresh",
+        "body": { "limit": 500 }
       }
     },
     {
@@ -247,7 +274,11 @@ https://<your-tunnel-host>/webhooks/<event_type>
       "request": {
         "method": "GET",
         "path": "/api/abm/signals",
-        "query": { "status": "NEW", "limit": "20" }
+        "query": {
+          "require_icp_match": "true",
+          "min_score": "0.5",
+          "limit": "20"
+        }
       },
       "command": "codex",
       "args": ["exec", "--sandbox", "read-only", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--disable", "shell_tool", "--disable", "unified_exec", "--disable", "apps", "--disable", "browser_use", "-"],
@@ -273,6 +304,9 @@ X-Signature: sha256=<hex>
 - Webhook and cron commands receive a minimal environment. Add command-specific values explicitly in the action's `env` object.
 - Webhook event IDs are validated, stored under hashed filenames, and deduplicated before actions run. The state directory and event files are private to the local user.
 - Leave `agent-runs:control` off unless the user explicitly wants a local agent to control Laserreach-hosted runs.
+- Grant `outreach:send` separately when the local agent should start governed
+  sequences. It does not imply `agent-runs:control`.
+- Use `laserreach_revoke_self` with `confirm: "REVOKE"` as the API kill switch.
 - The local reply preset is an explicit no-review mode. Use its daily limit and revoke the token to stop it.
 - Generic local drafting remains draft-only. Only inbound LinkedIn reply jobs can use the policy-gated send endpoint.
 

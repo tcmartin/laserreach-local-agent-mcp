@@ -79,6 +79,54 @@ export class LaserreachClient {
     return this.request({ method: "GET", path: "/api/abm/signals", query });
   }
 
+  assessSignal(signalId, body = {}) {
+    return this.request({
+      method: "PATCH",
+      path: `/api/abm/signals/${encodeURIComponent(signalId)}/assessment`,
+      body,
+    });
+  }
+
+  resolveSignalContact(signalId, personId) {
+    return this.request({
+      method: "PATCH",
+      path: `/api/abm/signals/${encodeURIComponent(signalId)}/contact`,
+      body: { person_id: personId },
+    });
+  }
+
+  listIcps(query = {}) {
+    return this.request({ method: "GET", path: "/api/abm/icps", query });
+  }
+
+  createIcp(body = {}) {
+    return this.request({ method: "POST", path: "/api/abm/icps", body });
+  }
+
+  updateIcp(icpId, body = {}) {
+    return this.request({
+      method: "PATCH",
+      path: `/api/abm/icps/${encodeURIComponent(icpId)}`,
+      body,
+    });
+  }
+
+  deleteIcp(icpId) {
+    return this.request({
+      method: "DELETE",
+      path: `/api/abm/icps/${encodeURIComponent(icpId)}`,
+    });
+  }
+
+  refreshIcps(body = {}, icpId = "") {
+    const suffix = icpId ? `/${encodeURIComponent(icpId)}` : "";
+    return this.request({
+      method: "POST",
+      path: `/api/abm/icps${suffix}/refresh`,
+      body,
+    });
+  }
+
   scorePendingSignals(body = {}) {
     return this.request({ method: "POST", path: "/api/abm/signals/score-pending", body });
   }
@@ -111,6 +159,18 @@ export class LaserreachClient {
 
   prepareMessages(body = {}) {
     return this.request({ method: "POST", path: "/api/abm/sequences/prepare-messages", body });
+  }
+
+  startSequence(sequenceId, body = {}) {
+    return this.request({
+      method: "POST",
+      path: `/api/abm/sequences/${encodeURIComponent(sequenceId)}/start`,
+      body,
+    });
+  }
+
+  revokeSelf() {
+    return this.request({ method: "DELETE", path: "/api/abm/agent/token" });
   }
 
   syncHubspotOutreach(body = {}) {

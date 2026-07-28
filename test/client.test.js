@@ -156,6 +156,66 @@ test("LaserreachClient drives the local reply claim, draft, and send endpoints",
   }
 });
 
+test("LaserreachClient exposes local assessment, ICP refresh, outbound, and kill-switch routes", async () => {
+  const requests = [];
+  const api = await startMockApi(async (req, res) => {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    requests.push({
+      method: req.method,
+      url: req.url,
+      body: body ? JSON.parse(body) : undefined,
+    });
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ success: true }));
+  });
+  try {
+    const client = new LaserreachClient({
+      apiBase: api.url,
+      orgId: "org_test",
+      token: "tok_test",
+    });
+    await client.listIcps({ status: "active" });
+    await client.refreshIcps({ limit: 50 });
+    await client.assessSignal("sig /1", {
+      intent_score: 0.8,
+      relevance_score: 0.7,
+      icp_match: true,
+      reasoning: "Local assessment",
+    });
+    await client.resolveSignalContact("sig /1", "person_1");
+    await client.startSequence("seq /1", { mode: "approved" });
+    await client.revokeSelf();
+    assert.deepEqual(requests, [
+      { method: "GET", url: "/api/abm/icps?status=active", body: undefined },
+      { method: "POST", url: "/api/abm/icps/refresh", body: { limit: 50 } },
+      {
+        method: "PATCH",
+        url: "/api/abm/signals/sig%20%2F1/assessment",
+        body: {
+          intent_score: 0.8,
+          relevance_score: 0.7,
+          icp_match: true,
+          reasoning: "Local assessment",
+        },
+      },
+      {
+        method: "PATCH",
+        url: "/api/abm/signals/sig%20%2F1/contact",
+        body: { person_id: "person_1" },
+      },
+      {
+        method: "POST",
+        url: "/api/abm/sequences/seq%20%2F1/start",
+        body: { mode: "approved" },
+      },
+      { method: "DELETE", url: "/api/abm/agent/token", body: undefined },
+    ]);
+  } finally {
+    await api.close();
+  }
+});
+
 test("LaserreachClient rejects absolute request URLs before attaching credentials", async () => {
   let called = false;
   const client = new LaserreachClient({

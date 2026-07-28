@@ -46,7 +46,16 @@ test("MCP server lists tools and calls capabilities", async () => {
     const tools = await client.listTools();
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_capabilities"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_list_signals"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_assess_signal"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_list_icps"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_manage_icp"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_refresh_icps"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_start_sequence"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_revoke_self"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_sync_hubspot_outreach"));
+    assert.ok(!tools.tools.some((tool) => tool.name === "laserreach_score_pending_signals"));
+    assert.ok(!tools.tools.some((tool) => tool.name === "laserreach_process_signals"));
+    assert.ok(!tools.tools.some((tool) => tool.name === "laserreach_prepare_messages"));
     const result = await client.callTool({ name: "laserreach_capabilities", arguments: {} });
     assert.match(result.content[0].text, /local_execution/);
   } finally {

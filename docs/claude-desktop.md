@@ -31,7 +31,9 @@ npm install -g github:tcmartin/laserreach-local-agent-mcp
 5. Ask Claude:
 
 ```text
-Call laserreach_capabilities and summarize the local-agent route groups. Do not use Laserreach-hosted run control.
+Call laserreach_capabilities and summarize the local-agent route groups. Use
+the ICP, signal-assessment, and contact-resolution tools for local reasoning.
+Do not use Laserreach-hosted run control.
 ```
 
 Keep `agent-runs:control` off unless the user intentionally wants Claude to control Laserreach-hosted runs.

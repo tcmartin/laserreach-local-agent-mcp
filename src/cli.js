@@ -59,12 +59,12 @@ async function initConfig(path) {
     ],
     jobs: [
       {
-        name: "Score pending signals every 30 minutes",
-        cron: "*/30 * * * *",
+        name: "Refresh deterministic ICP scoring daily",
+        cron: "15 3 * * *",
         request: {
           method: "POST",
-          path: "/api/abm/signals/score-pending",
-          body: { limit: 25 },
+          path: "/api/abm/icps/refresh",
+          body: { limit: 500 },
         },
       },
       {
@@ -73,7 +73,7 @@ async function initConfig(path) {
         request: {
           method: "GET",
           path: "/api/abm/signals",
-          query: { status: "NEW", limit: "20" },
+          query: { require_icp_match: "true", min_score: "0.5", limit: "20" },
         },
         command: safeCodex.command,
         args: safeCodex.args,
