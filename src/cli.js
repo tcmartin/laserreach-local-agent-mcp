@@ -6,13 +6,20 @@ import { resolve } from "node:path";
 import { LaserreachClient } from "./client.js";
 import { DEFAULT_CONFIG_PATH, loadRunnerConfig } from "./config.js";
 import { runMcpServer } from "./mcp.js";
-import { LocalAgentRunner } from "./runner.js";
+import {
+  assertReplyEngineReady,
+  defaultReplyCommand,
+  LocalAgentRunner,
+  runLocalReplyDaemon,
+  runLocalReplyOnce,
+} from "./runner.js";
 
 const HELP = `Laserreach local agent helper
 
 Usage:
   laserreach-local-agent mcp
   laserreach-local-agent serve [--config ./laserreach.local-agent.config.json]
+  laserreach-local-agent replies [--engine codex|claude] [--once]
   laserreach-local-agent capabilities
   laserreach-local-agent request <METHOD> <PATH> [JSON_BODY]
   laserreach-local-agent init [--path ./laserreach.local-agent.config.json]
@@ -37,6 +44,7 @@ function printJson(payload) {
 
 async function initConfig(path) {
   const target = resolve(path || DEFAULT_CONFIG_PATH);
+  const safeCodex = defaultReplyCommand("codex");
   const sample = {
     host: "127.0.0.1",
     port: 8797,
@@ -44,8 +52,8 @@ async function initConfig(path) {
       {
         event: "signal.created",
         name: "Send event to local Codex",
-        command: "codex",
-        args: ["exec", "--skip-git-repo-check"],
+        command: safeCodex.command,
+        args: safeCodex.args,
         template: "Use Laserreach APIs to inspect this event and propose next actions. Event: {{json}}",
       },
     ],
@@ -67,8 +75,8 @@ async function initConfig(path) {
           path: "/api/abm/signals",
           query: { status: "NEW", limit: "20" },
         },
-        command: "codex",
-        args: ["exec", "--skip-git-repo-check"],
+        command: safeCodex.command,
+        args: safeCodex.args,
         template: "Review these Laserreach signals and recommend next actions. API result: {{result}}",
       },
     ],
@@ -106,6 +114,52 @@ async function main() {
     const runner = new LocalAgentRunner(config);
     const address = await runner.start();
     console.error(`[laserreach-local-agent] listening on http://${address.host}:${address.port}`);
+    return;
+  }
+  if (command === "replies") {
+    const engine = argValue(args, "--engine", "codex");
+    if (!["codex", "claude"].includes(engine)) {
+      throw new Error("--engine must be codex or claude");
+    }
+    const commandOverride = argValue(args, "--command");
+    const argsRaw = argValue(args, "--args");
+    const commandArgs = argsRaw ? JSON.parse(argsRaw) : undefined;
+    if (commandArgs && !Array.isArray(commandArgs)) {
+      throw new Error("--args must be a JSON array");
+    }
+    const options = {
+      engine,
+      command: commandOverride,
+      args: commandArgs,
+      intervalMs: Number(argValue(args, "--interval-ms", "2000")),
+      timeoutMs: Number(argValue(args, "--timeout-ms", "180000")),
+      cwd: argValue(args, "--cwd"),
+    };
+    if (!commandOverride) {
+      await assertReplyEngineReady(engine);
+    }
+    if (args.includes("--once")) {
+      printJson(await runLocalReplyOnce(options));
+      return;
+    }
+    const controller = new AbortController();
+    const stop = () => controller.abort();
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+    console.error(
+      `[laserreach-local-agent] polling LinkedIn replies with ${engine}; Ctrl-C to stop`,
+    );
+    await runLocalReplyDaemon({
+      ...options,
+      signal: controller.signal,
+      onResult(result) {
+        if (result.processed) {
+          console.error(
+            `[laserreach-local-agent] reply ${result.job_id} finished with ${result.state}`,
+          );
+        }
+      },
+    });
     return;
   }
   if (command === "sign") {

@@ -1,3 +1,13 @@
 export { LaserreachClient } from "./client.js";
 export { createMcpServer, runMcpServer } from "./mcp.js";
-export { LocalAgentRunner, renderTemplate, runCommand, runConfiguredRequest, verifySignature } from "./runner.js";
+export {
+  LocalAgentRunner,
+  defaultReplyCommand,
+  generateReplyWithCommand,
+  renderTemplate,
+  runCommand,
+  runConfiguredRequest,
+  runLocalReplyDaemon,
+  runLocalReplyOnce,
+  verifySignature,
+} from "./runner.js";

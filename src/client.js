@@ -5,7 +5,9 @@ import { requireLaserreachEnv } from "./config.js";
 function normalizePath(path) {
   const raw = String(path || "").trim();
   if (!raw) throw new Error("path is required");
-  if (/^https?:\/\//i.test(raw)) return raw;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) || raw.startsWith("//")) {
+    throw new Error("path must be relative to LASERREACH_API_BASE");
+  }
   return raw.startsWith("/") ? raw : `/${raw}`;
 }
 
@@ -21,7 +23,7 @@ export class LaserreachClient {
 
   buildUrl(path, query = undefined) {
     const normalized = normalizePath(path);
-    const url = new URL(/^https?:\/\//i.test(normalized) ? normalized : `${this.apiBase}${normalized}`);
+    const url = new URL(`${this.apiBase}${normalized}`);
     for (const [key, value] of Object.entries(query || {})) {
       if (value === undefined || value === null || value === "") continue;
       url.searchParams.set(key, String(value));
@@ -113,5 +115,38 @@ export class LaserreachClient {
 
   syncHubspotOutreach(body = {}) {
     return this.request({ method: "POST", path: "/api/abm/crm/hubspot/outreach-sync", body });
+  }
+
+  claimLocalDraftJob(body = {}) {
+    return this.request({
+      method: "POST",
+      path: "/api/abm/local-draft-jobs/claim",
+      body,
+    });
+  }
+
+  submitLocalDraft(jobId, body = {}, idempotencyKey = "") {
+    return this.request({
+      method: "POST",
+      path: `/api/abm/local-draft-jobs/${encodeURIComponent(jobId)}/drafts`,
+      body,
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
+    });
+  }
+
+  sendLocalReply(jobId) {
+    return this.request({
+      method: "POST",
+      path: `/api/abm/local-draft-jobs/${encodeURIComponent(jobId)}/send`,
+      body: {},
+    });
+  }
+
+  cancelLocalDraftJob(jobId) {
+    return this.request({
+      method: "POST",
+      path: `/api/abm/local-draft-jobs/${encodeURIComponent(jobId)}/cancel`,
+      body: {},
+    });
   }
 }

@@ -5,6 +5,7 @@ Use Claude Desktop, Codex, or another local agent with Laserreach without handin
 This package provides:
 
 - an MCP stdio server with Laserreach tools for local agents;
+- an automatic LinkedIn reply daemon powered by the user's signed-in Codex or Claude Code;
 - a webhook receiver for Laserreach, HubSpot, Zapier, Make, n8n, and other JSON event sources;
 - cron-style scheduled jobs that can call Laserreach APIs and optionally pass results to a local command such as `codex`.
 
@@ -45,6 +46,72 @@ Test the connection:
 ```bash
 laserreach-local-agent capabilities
 ```
+
+## Automatic LinkedIn Replies With Local Codex Or Claude Code
+
+This path does not use a Laserreach-hosted model:
+
+```text
+LinkedIn inbound webhook
+  -> tenant-bound Laserreach queue
+  -> local polling daemon
+  -> signed-in Codex or Claude Code
+  -> Laserreach policy gate
+  -> Unipile send
+```
+
+Create an **Automatic local LinkedIn replies** token in Laserreach first. That preset enables only `local-drafts:run` and the narrow `local-replies:send` permission. It also sets an organization daily limit.
+
+Install the helper and export the one-time setup values:
+
+```bash
+npm install -g github:tcmartin/laserreach-local-agent-mcp
+export LASERREACH_API_BASE="https://api.laserreach.com"
+export LASERREACH_ORG_ID="<org_id>"
+export LASERREACH_AGENT_TOKEN="<external_agent_token>"
+laserreach-local-agent replies --engine codex --once
+```
+
+Run with the local Codex login:
+
+```bash
+laserreach-local-agent replies --engine codex
+```
+
+Or run with the local Claude Code login:
+
+```bash
+laserreach-local-agent replies --engine claude
+```
+
+The process polls continuously. Keep it running on a computer with the selected
+CLI already signed in. Startup checks authentication before claiming any job.
+No per-message approval is requested. Codex runs ephemerally with user config,
+rules, shell, exec, apps, browser, hooks, subagents, and image tools disabled.
+Claude Code runs in print mode with all tools disabled, `dontAsk`, and no
+session persistence. Each command runs in a temporary empty directory with a
+minimal environment. The Laserreach token and unrelated application secrets
+are not passed to it.
+
+Laserreach enforces these checks after the local process returns text:
+
+- the token is still active and assigned to the organization;
+- the job is an inbound LinkedIn reply, not an arbitrary outbound job;
+- the LinkedIn account is active and belongs to that organization;
+- the automatic-reply setting and global kill switch are enabled;
+- the organization has remaining queue and send capacity for the UTC day;
+- the thread has not been marked as manually handled;
+- the send reservation has not already been used.
+
+Queue admission is capped before Codex or Claude Code runs. A local command failure cancels that job instead of retrying and consuming another local model call. An ambiguous provider failure is not retried automatically, which prevents duplicate LinkedIn messages.
+
+Test one poll without leaving a daemon running:
+
+```bash
+laserreach-local-agent replies --engine codex --once
+```
+
+Immediate kill switch: revoke the runner token in Laserreach. Revocation also disables automatic local replies for the organization.
 
 ## MCP Server
 
@@ -133,6 +200,7 @@ Local webhook smoke:
 ```bash
 curl -X POST "http://127.0.0.1:8797/webhooks/signal.created" \
   -H "Content-Type: application/json" \
+  -H "X-Laserreach-Signature: sha256=<HMAC-SHA256-of-the-exact-body>" \
   -d '{"event_id":"evt_demo","type":"signal.created","company_name":"ExampleCo"}'
 ```
 
@@ -159,7 +227,7 @@ https://<your-tunnel-host>/webhooks/<event_type>
       "event": "signal.created",
       "name": "Draft local follow-up",
       "command": "codex",
-      "args": ["exec", "--skip-git-repo-check"],
+      "args": ["exec", "--sandbox", "read-only", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--disable", "shell_tool", "--disable", "unified_exec", "--disable", "apps", "--disable", "browser_use", "-"],
       "template": "Use Laserreach APIs to inspect this event and propose next actions. Event: {{json}}"
     }
   ],
@@ -182,7 +250,7 @@ https://<your-tunnel-host>/webhooks/<event_type>
         "query": { "status": "NEW", "limit": "20" }
       },
       "command": "codex",
-      "args": ["exec", "--skip-git-repo-check"],
+      "args": ["exec", "--sandbox", "read-only", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--disable", "shell_tool", "--disable", "unified_exec", "--disable", "apps", "--disable", "browser_use", "-"],
       "template": "Review these Laserreach signals and recommend next actions. API result: {{result}}"
     }
   ]
@@ -200,10 +268,13 @@ X-Signature: sha256=<hex>
 ## Security Notes
 
 - Keep `LASERREACH_AGENT_TOKEN` in local environment variables or a secret manager.
-- Keep `LASERREACH_WEBHOOK_SECRET` set before exposing the webhook receiver.
+- `serve` refuses to start with webhook handlers unless `LASERREACH_WEBHOOK_SECRET` is set.
 - Do not store tokens in config files.
+- Webhook and cron commands receive a minimal environment. Add command-specific values explicitly in the action's `env` object.
+- Webhook event IDs are validated, stored under hashed filenames, and deduplicated before actions run. The state directory and event files are private to the local user.
 - Leave `agent-runs:control` off unless the user explicitly wants a local agent to control Laserreach-hosted runs.
-- Prefer staging outreach for human review. Laserreach still enforces token scopes and org policies.
+- The local reply preset is an explicit no-review mode. Use its daily limit and revoke the token to stop it.
+- Generic local drafting remains draft-only. Only inbound LinkedIn reply jobs can use the policy-gated send endpoint.
 
 ## Development
 
@@ -212,4 +283,4 @@ npm install
 npm test
 ```
 
-The tests cover the API client, webhook signature verification, command/template runner behavior, scheduled request behavior, and the MCP stdio server.
+The tests cover the API client, webhook signature verification, command/template runner behavior, scheduled requests, the MCP stdio server, local reply prompt isolation, claim/draft/send flow, and no-retry behavior after local model failures.
