@@ -63,6 +63,34 @@ test("LaserreachClient includes JSON bodies and reports API errors", async () =>
   }
 });
 
+test("LaserreachClient always requests local processing for source collection", async () => {
+  const api = await startMockApi(async (req, res) => {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    assert.equal(req.method, "POST");
+    assert.equal(req.url, "/api/abm/sources/source%20%2F1/collect");
+    assert.deepEqual(JSON.parse(body), {
+      requested_by: "codex",
+      processing_mode: "local",
+    });
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ success: true, processing_mode: "local" }));
+  });
+  try {
+    const client = new LaserreachClient({
+      apiBase: api.url,
+      orgId: "org_test",
+      token: "tok_test",
+    });
+    assert.deepEqual(
+      await client.collectSource("source /1", { requested_by: "codex" }),
+      { success: true, processing_mode: "local" },
+    );
+  } finally {
+    await api.close();
+  }
+});
+
 test("LaserreachClient syncs local outreach to HubSpot endpoint", async () => {
   const api = await startMockApi(async (req, res) => {
     let body = "";
@@ -184,7 +212,25 @@ test("LaserreachClient exposes local assessment, ICP refresh, outbound, and kill
       reasoning: "Local assessment",
     });
     await client.resolveSignalContact("sig /1", "person_1");
+    await client.createLocalSequence({
+      name: "Local sequence",
+      steps: [{
+        type: "li_message",
+        message: "Hello from the local agent",
+        use_ai: true,
+      }],
+    });
     await client.startSequence("seq /1", { mode: "approved" });
+    await client.launchCampaignSegment({ sequence_id: "seq /1", dry_run: true });
+    await client.sendPipelineMessage("pipe /1", "Send this");
+    await client.publishContent({
+      calendar_item_id: "content_1",
+      connector: "manual",
+    });
+    await client.sendNewsletter("news /1", {
+      channel: "email",
+      recipients: ["owner@example.com"],
+    });
     await client.revokeSelf();
     assert.deepEqual(requests, [
       { method: "GET", url: "/api/abm/icps?status=active", body: undefined },
@@ -206,8 +252,40 @@ test("LaserreachClient exposes local assessment, ICP refresh, outbound, and kill
       },
       {
         method: "POST",
+        url: "/api/abm/sequences",
+        body: {
+          name: "Local sequence",
+          steps: [{
+            type: "li_message",
+            message: "Hello from the local agent",
+            use_ai: false,
+          }],
+        },
+      },
+      {
+        method: "POST",
         url: "/api/abm/sequences/seq%20%2F1/start",
         body: { mode: "approved" },
+      },
+      {
+        method: "POST",
+        url: "/api/abm/campaigns/launch-segment",
+        body: { sequence_id: "seq /1", dry_run: true },
+      },
+      {
+        method: "POST",
+        url: "/api/abm/pipelines/pipe%20%2F1/messages/send",
+        body: { text: "Send this" },
+      },
+      {
+        method: "POST",
+        url: "/api/abm/content/publish",
+        body: { calendar_item_id: "content_1", connector: "manual" },
+      },
+      {
+        method: "POST",
+        url: "/api/abm/newsletters/news%20%2F1/send",
+        body: { channel: "email", recipients: ["owner@example.com"] },
       },
       { method: "DELETE", url: "/api/abm/agent/token", body: undefined },
     ]);

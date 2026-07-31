@@ -24,8 +24,53 @@ function startMockApi(handler) {
   });
 }
 
-test("MCP server lists tools and calls capabilities", async () => {
-  const api = await startMockApi((req, res) => {
+test("MCP server lists tools and calls capabilities plus self-governed actions", async () => {
+  const api = await startMockApi(async (req, res) => {
+    if (req.url === "/api/abm/content/publish") {
+      let body = "";
+      for await (const chunk of req) body += chunk;
+      assert.equal(req.method, "POST");
+      assert.deepEqual(JSON.parse(body), {
+        calendar_item_id: "content_1",
+        connector: "manual",
+        dry_run: true,
+      });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ success: true, status: "published" }));
+      return;
+    }
+    if (req.url === "/api/abm/campaigns/launch-segment") {
+      let body = "";
+      for await (const chunk of req) body += chunk;
+      assert.equal(req.method, "POST");
+      assert.deepEqual(JSON.parse(body), {
+        sequence_id: "seq_1",
+        linkedin_account: "sender_1",
+        icp_id: "icp_1",
+        require_icp_match: true,
+        dry_run: true,
+      });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ success: true, dry_run: true }));
+      return;
+    }
+    if (req.url === "/api/abm/sequences") {
+      let body = "";
+      for await (const chunk of req) body += chunk;
+      assert.equal(req.method, "POST");
+      assert.deepEqual(JSON.parse(body), {
+        name: "Local sequence",
+        steps: [{
+          type: "li_message",
+          delay_minutes: 0,
+          message: "Hello from the local model",
+          use_ai: false,
+        }],
+      });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ success: true, sequence_id: "seq_local" }));
+      return;
+    }
     assert.equal(req.url, "/api/abm/agent/capabilities");
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ local_agent_default: { mode: "local_execution" } }));
@@ -50,7 +95,12 @@ test("MCP server lists tools and calls capabilities", async () => {
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_list_icps"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_manage_icp"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_refresh_icps"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_create_local_sequence"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_start_sequence"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_launch_campaign_segment"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_send_pipeline_message"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_publish_content"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_send_newsletter"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_revoke_self"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_sync_hubspot_outreach"));
     assert.ok(!tools.tools.some((tool) => tool.name === "laserreach_score_pending_signals"));
@@ -58,6 +108,38 @@ test("MCP server lists tools and calls capabilities", async () => {
     assert.ok(!tools.tools.some((tool) => tool.name === "laserreach_prepare_messages"));
     const result = await client.callTool({ name: "laserreach_capabilities", arguments: {} });
     assert.match(result.content[0].text, /local_execution/);
+    const sequenceResult = await client.callTool({
+      name: "laserreach_create_local_sequence",
+      arguments: {
+        name: "Local sequence",
+        steps: [{
+          type: "li_message",
+          delay_minutes: 0,
+          message: "Hello from the local model",
+        }],
+      },
+    });
+    assert.match(sequenceResult.content[0].text, /seq_local/);
+    const publishResult = await client.callTool({
+      name: "laserreach_publish_content",
+      arguments: {
+        calendar_item_id: "content_1",
+        connector: "manual",
+        dry_run: true,
+      },
+    });
+    assert.match(publishResult.content[0].text, /published/);
+    const campaignResult = await client.callTool({
+      name: "laserreach_launch_campaign_segment",
+      arguments: {
+        sequence_id: "seq_1",
+        linkedin_account: "sender_1",
+        icp_id: "icp_1",
+        require_icp_match: true,
+        dry_run: true,
+      },
+    });
+    assert.match(campaignResult.content[0].text, /dry_run/);
   } finally {
     await client.close();
     await api.close();

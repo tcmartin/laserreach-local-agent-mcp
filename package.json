@@ -1,7 +1,7 @@
 {
   "name": "laserreach-local-agent-mcp",
-  "version": "0.3.0",
-  "description": "Local MCP, webhook, cron, and policy-gated LinkedIn reply runner for Laserreach.",
+  "version": "0.5.0",
+  "description": "Local MCP, webhook, cron, and self-governed execution helper for Laserreach.",
   "type": "module",
   "license": "MIT",
   "bin": {

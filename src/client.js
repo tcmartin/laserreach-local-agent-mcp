@@ -72,7 +72,11 @@ export class LaserreachClient {
   }
 
   collectSource(sourceId, body = {}) {
-    return this.request({ method: "POST", path: `/api/abm/sources/${encodeURIComponent(sourceId)}/collect`, body });
+    return this.request({
+      method: "POST",
+      path: `/api/abm/sources/${encodeURIComponent(sourceId)}/collect`,
+      body: { ...body, processing_mode: "local" },
+    });
   }
 
   listSignals(query = {}) {
@@ -161,10 +165,53 @@ export class LaserreachClient {
     return this.request({ method: "POST", path: "/api/abm/sequences/prepare-messages", body });
   }
 
+  createLocalSequence(body = {}) {
+    const steps = Array.isArray(body.steps)
+      ? body.steps.map((step) => ({ ...step, use_ai: false }))
+      : [];
+    return this.request({
+      method: "POST",
+      path: "/api/abm/sequences",
+      body: { ...body, steps },
+    });
+  }
+
   startSequence(sequenceId, body = {}) {
     return this.request({
       method: "POST",
       path: `/api/abm/sequences/${encodeURIComponent(sequenceId)}/start`,
+      body,
+    });
+  }
+
+  launchCampaignSegment(body = {}) {
+    return this.request({
+      method: "POST",
+      path: "/api/abm/campaigns/launch-segment",
+      body,
+    });
+  }
+
+  sendPipelineMessage(pipelineId, text) {
+    return this.request({
+      method: "POST",
+      path: `/api/abm/pipelines/${encodeURIComponent(pipelineId)}/messages/send`,
+      body: { text },
+    });
+  }
+
+  publishContent(body = {}) {
+    return this.request({
+      method: "POST",
+      path: "/api/abm/content/publish",
+      body,
+    });
+  }
+
+  sendNewsletter(newsletterId, body = {}) {
+    return this.request({
+      method: "POST",
+      path: `/api/abm/newsletters/${encodeURIComponent(newsletterId)}/send`,
       body,
     });
   }

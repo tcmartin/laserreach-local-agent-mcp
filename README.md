@@ -31,8 +31,9 @@ npm link
 3. Go to **Settings > External Agents**.
 4. Create a token for Claude Cowork, Codex, or your local agent.
 5. Keep **Laserreach-hosted run control** off for normal local-agent use.
-6. Enable **Outbound send** only when this agent should start governed
-   sequences. This does not enable hosted runs.
+6. Choose **Self-governed local agent** when the agent should send and publish
+   without per-action approval. Account caps and execution controls remain
+   active. This does not enable hosted runs.
 7. Copy the one-time setup block.
 
 Set these environment variables:
@@ -147,7 +148,8 @@ See [docs/claude-desktop.md](docs/claude-desktop.md) for the full setup.
 
 - `laserreach_capabilities`: fetch the live capability catalog.
 - `laserreach_list_sources`: list signal sources.
-- `laserreach_collect_source`: trigger collection for one source.
+- `laserreach_collect_source`: collect raw signals without LaserReach-hosted
+  scoring. The local agent assesses them with `laserreach_assess_signal`.
 - `laserreach_list_signals`: list ICP-matched signals by default, or request the
   raw feed.
 - `laserreach_assess_signal`: store scoring produced by the local agent.
@@ -161,15 +163,23 @@ See [docs/claude-desktop.md](docs/claude-desktop.md) for the full setup.
 - `laserreach_dismiss_signal`: dismiss a signal.
 - `laserreach_list_targets`: list companies or people.
 - `laserreach_list_senders`: list LinkedIn/email sender connections.
-- `laserreach_start_sequence`: start a governed sequence when the token has
+- `laserreach_create_local_sequence`: save locally generated outreach copy with
+  `use_ai=false`; LaserReach does not call a hosted model.
+- `laserreach_start_sequence`: start a sequence when the token has
   `outreach:send`.
+- `laserreach_launch_campaign_segment`: queue a sequence for a selected segment.
+- `laserreach_send_pipeline_message`: send a direct LinkedIn pipeline message.
+- `laserreach_publish_content`: publish a content calendar item.
+- `laserreach_send_newsletter`: send an account newsletter by email or Slack.
 - `laserreach_sync_hubspot_outreach`: log local-agent outreach to HubSpot. Use `dry_run: true` first.
 - `laserreach_revoke_self`: permanently revoke the current token.
 - `laserreach_request`: generic scoped request for advanced use.
 
-The normal MCP tools do not call Laserreach-hosted signal scoring or agent
-runs. The local Claude, Codex, or other MCP client performs reasoning and stores
-its result with `laserreach_assess_signal`.
+The normal MCP tools do not call LaserReach-hosted signal scoring, generation,
+or agent runs. The local Claude, Codex, or other MCP client performs reasoning,
+stores assessments with `laserreach_assess_signal`, and stores outreach copy
+with `laserreach_create_local_sequence`. Direct API calls to model-backed
+endpoints require the separate `hosted-ai:use` scope.
 
 ## ICP And Signal Workflow
 
@@ -304,8 +314,13 @@ X-Signature: sha256=<hex>
 - Webhook and cron commands receive a minimal environment. Add command-specific values explicitly in the action's `env` object.
 - Webhook event IDs are validated, stored under hashed filenames, and deduplicated before actions run. The state directory and event files are private to the local user.
 - Leave `agent-runs:control` off unless the user explicitly wants a local agent to control Laserreach-hosted runs.
-- Grant `outreach:send` separately when the local agent should start governed
-  sequences. It does not imply `agent-runs:control`.
+- Leave `hosted-ai:use` off when the local agent supplies signal reasoning and
+  outreach copy.
+- Grant `outreach:send` when the local agent should send messages, newsletters,
+  or start campaigns. It does not imply `agent-runs:control`.
+- Self-governed mode removes human approvals. Organization caps, sender and
+  connector checks, business hours, deduplication, kill switches, scopes, and
+  audit logging remain enforced.
 - Use `laserreach_revoke_self` with `confirm: "REVOKE"` as the API kill switch.
 - The local reply preset is an explicit no-review mode. Use its daily limit and revoke the token to stop it.
 - Generic local drafting remains draft-only. Only inbound LinkedIn reply jobs can use the policy-gated send endpoint.
