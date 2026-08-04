@@ -39,6 +39,101 @@ async function wrap(fn) {
   }
 }
 
+function literalUnion(values) {
+  const literals = [...new Set(values || [])].map((value) => z.literal(value));
+  if (literals.length === 0) return z.any();
+  if (literals.length === 1) return literals[0];
+  return z.union(literals);
+}
+
+export function jsonSchemaToZod(schema = {}) {
+  if (!schema || typeof schema !== "object") return z.any();
+  if (Object.hasOwn(schema, "const")) return z.literal(schema.const);
+  if (Array.isArray(schema.enum)) return literalUnion(schema.enum);
+  const alternatives = schema.anyOf || schema.oneOf;
+  if (Array.isArray(alternatives) && alternatives.length > 0) {
+    const members = alternatives.map((entry) => jsonSchemaToZod(entry));
+    return members.length === 1 ? members[0] : z.union(members);
+  }
+  const declaredTypes = Array.isArray(schema.type) ? schema.type : [schema.type];
+  const nullable = declaredTypes.includes("null") || schema.nullable === true;
+  const type = declaredTypes.find((value) => value && value !== "null");
+  let result;
+  if (type === "object" || schema.properties) {
+    const required = new Set(Array.isArray(schema.required) ? schema.required : []);
+    const shape = {};
+    for (const [name, propertySchema] of Object.entries(schema.properties || {})) {
+      const field = jsonSchemaToZod(propertySchema);
+      shape[name] = required.has(name) ? field : field.optional();
+    }
+    result = z.object(shape);
+    if (schema.additionalProperties !== false) result = result.passthrough();
+  } else if (type === "array") {
+    result = z.array(jsonSchemaToZod(schema.items || {}));
+    if (Number.isInteger(schema.minItems)) result = result.min(schema.minItems);
+    if (Number.isInteger(schema.maxItems)) result = result.max(schema.maxItems);
+  } else if (type === "integer") {
+    result = z.number().int();
+  } else if (type === "number") {
+    result = z.number();
+  } else if (type === "boolean") {
+    result = z.boolean();
+  } else if (type === "string") {
+    result = z.string();
+    if (Number.isInteger(schema.minLength)) result = result.min(schema.minLength);
+    if (Number.isInteger(schema.maxLength)) result = result.max(schema.maxLength);
+    if (typeof schema.pattern === "string" && schema.pattern) {
+      result = result.regex(new RegExp(schema.pattern));
+    }
+  } else {
+    result = z.any();
+  }
+  if ((type === "integer" || type === "number") && typeof schema.minimum === "number") {
+    result = result.min(schema.minimum);
+  }
+  if ((type === "integer" || type === "number") && typeof schema.maximum === "number") {
+    result = result.max(schema.maximum);
+  }
+  return nullable ? result.nullable() : result;
+}
+
+export function registerSiteParityTools(server, client, manifest = {}) {
+  const rows = Array.isArray(manifest.tools) ? manifest.tools : [];
+  const registered = [];
+  const seen = new Set();
+  for (const row of rows) {
+    const fn = row && typeof row === "object" ? row.function : null;
+    const name = String(fn?.name || "").trim();
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    const access = row["x-laserreach-access"] || {};
+    const mutation = String(access.mutation || "write");
+    server.registerTool(
+      name,
+      {
+        title: name,
+        description: [
+          String(fn.description || name),
+          `LaserReach site-tool parity; mutation=${mutation}; required scopes=${(access.required_scopes || []).join(",") || "none"}.`,
+        ].join(" "),
+        inputSchema: jsonSchemaToZod(fn.parameters || { type: "object", properties: {} }),
+        annotations: {
+          readOnlyHint: mutation === "read",
+          destructiveHint: ["outbound", "publish", "runtime_shell"].includes(mutation),
+          idempotentHint: mutation === "read",
+        },
+        _meta: {
+          "laserreach/registryVersion": manifest.registry_version,
+          "laserreach/access": access,
+        },
+      },
+      async (args) => wrap(() => client.invokeSiteTool(name, args || {})),
+    );
+    registered.push(name);
+  }
+  return registered;
+}
+
 export function registerLaserreachTools(server, client) {
   server.registerTool(
     "laserreach_capabilities",
@@ -48,6 +143,20 @@ export function registerLaserreachTools(server, client) {
       inputSchema: {},
     },
     async () => wrap(() => client.capabilities()),
+  );
+
+  server.registerTool(
+    "laserreach_site_tools_manifest",
+    {
+      title: "Get site-agent tool manifest",
+      description: "Refresh the authoritative, token-scoped website-agent tool registry and policy decisions.",
+      inputSchema: {
+        include_instructions: z.boolean().default(false),
+      },
+    },
+    async ({ include_instructions }) => wrap(
+      () => client.siteTools({ includeInstructions: include_instructions }),
+    ),
   );
 
   server.registerTool(

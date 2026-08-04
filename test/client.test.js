@@ -38,6 +38,42 @@ test("LaserreachClient sends bearer token and org header", async () => {
   }
 });
 
+test("LaserreachClient fetches and invokes the authoritative site tool registry", async () => {
+  const requests = [];
+  const api = await startMockApi(async (req, res) => {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    requests.push({ method: req.method, url: req.url, body: body ? JSON.parse(body) : undefined });
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ success: true }));
+  });
+  try {
+    const client = new LaserreachClient({
+      apiBase: api.url,
+      orgId: "org_test",
+      token: "token_test",
+    });
+
+    await client.siteTools({ includeInstructions: false });
+    await client.invokeSiteTool("list_companies", { limit: 3 });
+
+    assert.deepEqual(requests, [
+      {
+        method: "GET",
+        url: "/api/abm/agent/tools?include_instructions=false",
+        body: undefined,
+      },
+      {
+        method: "POST",
+        url: "/api/abm/agent/tools/list_companies/invoke",
+        body: { arguments: { limit: 3 } },
+      },
+    ]);
+  } finally {
+    await api.close();
+  }
+});
+
 test("LaserreachClient includes JSON bodies and reports API errors", async () => {
   const api = await startMockApi(async (req, res) => {
     let body = "";
@@ -86,6 +122,32 @@ test("LaserreachClient always requests local processing for source collection", 
       await client.collectSource("source /1", { requested_by: "codex" }),
       { success: true, processing_mode: "local" },
     );
+  } finally {
+    await api.close();
+  }
+});
+
+test("LaserreachClient prepares messages on the sequence-scoped route", async () => {
+  const api = await startMockApi(async (req, res) => {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    assert.equal(req.method, "POST");
+    assert.equal(req.url, "/api/abm/sequences/sequence%20one/prepare-messages");
+    assert.deepEqual(JSON.parse(body), { person_id: "person-1" });
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ success: true }));
+  });
+  try {
+    const client = new LaserreachClient({
+      apiBase: api.url,
+      token: "token",
+      orgId: "org",
+    });
+    assert.deepEqual(
+      await client.prepareMessages("sequence one", { person_id: "person-1" }),
+      { success: true },
+    );
+    assert.throws(() => client.prepareMessages("", {}), /sequenceId is required/);
   } finally {
     await api.close();
   }

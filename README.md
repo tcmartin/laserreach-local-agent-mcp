@@ -146,7 +146,17 @@ See [docs/claude-desktop.md](docs/claude-desktop.md) for the full setup.
 
 ## MCP Tools
 
+At startup the MCP fetches the token-scoped website-agent manifest and
+registers every allowed canonical tool under its exact site name. This removes
+the former hand-maintained parity gap. `laserreach_site_tools_manifest`
+refreshes the manifest metadata. A self-governed token with `*` scope receives
+every tenant-safe site tool; account governance remains user-managed.
+
+The following `laserreach_*` convenience tools remain available:
+
 - `laserreach_capabilities`: fetch the live capability catalog.
+- `laserreach_site_tools_manifest`: fetch the authoritative token-scoped site
+  tool manifest and policy decisions.
 - `laserreach_list_sources`: list signal sources.
 - `laserreach_collect_source`: collect raw signals without LaserReach-hosted
   scoring. The local agent assesses them with `laserreach_assess_signal`.

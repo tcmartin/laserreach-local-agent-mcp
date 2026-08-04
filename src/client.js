@@ -67,6 +67,22 @@ export class LaserreachClient {
     return this.request({ method: "GET", path: "/api/abm/agent/capabilities" });
   }
 
+  siteTools({ includeInstructions = false } = {}) {
+    return this.request({
+      method: "GET",
+      path: "/api/abm/agent/tools",
+      query: { include_instructions: includeInstructions ? "true" : "false" },
+    });
+  }
+
+  invokeSiteTool(toolName, args = {}) {
+    return this.request({
+      method: "POST",
+      path: `/api/abm/agent/tools/${encodeURIComponent(toolName)}/invoke`,
+      body: { arguments: args },
+    });
+  }
+
   listSources(query = {}) {
     return this.request({ method: "GET", path: "/api/abm/sources", query });
   }
@@ -161,8 +177,13 @@ export class LaserreachClient {
     ]).then(([linkedin, email]) => ({ linkedin, email }));
   }
 
-  prepareMessages(body = {}) {
-    return this.request({ method: "POST", path: "/api/abm/sequences/prepare-messages", body });
+  prepareMessages(sequenceId, body = {}) {
+    if (!String(sequenceId || "").trim()) throw new Error("sequenceId is required");
+    return this.request({
+      method: "POST",
+      path: `/api/abm/sequences/${encodeURIComponent(sequenceId)}/prepare-messages`,
+      body,
+    });
   }
 
   createLocalSequence(body = {}) {

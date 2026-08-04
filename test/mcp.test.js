@@ -26,6 +26,38 @@ function startMockApi(handler) {
 
 test("MCP server lists tools and calls capabilities plus self-governed actions", async () => {
   const api = await startMockApi(async (req, res) => {
+    if (req.url === "/api/abm/agent/tools?include_instructions=false") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        success: true,
+        registry_version: "registry_test",
+        tools: [{
+          type: "function",
+          function: {
+            name: "list_companies",
+            description: "List companies from the site registry.",
+            parameters: {
+              type: "object",
+              properties: { limit: { type: "integer", minimum: 1, maximum: 20 } },
+            },
+          },
+          "x-laserreach-access": {
+            mutation: "read",
+            required_scopes: ["abm:read"],
+          },
+        }],
+      }));
+      return;
+    }
+    if (req.url === "/api/abm/agent/tools/list_companies/invoke") {
+      let body = "";
+      for await (const chunk of req) body += chunk;
+      assert.equal(req.method, "POST");
+      assert.deepEqual(JSON.parse(body), { arguments: { limit: 3 } });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ success: true, result: { companies: [] } }));
+      return;
+    }
     if (req.url === "/api/abm/content/publish") {
       let body = "";
       for await (const chunk of req) body += chunk;
@@ -90,6 +122,8 @@ test("MCP server lists tools and calls capabilities plus self-governed actions",
     await client.connect(transport);
     const tools = await client.listTools();
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_capabilities"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_site_tools_manifest"));
+    assert.ok(tools.tools.some((tool) => tool.name === "list_companies"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_list_signals"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_assess_signal"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_list_icps"));
@@ -109,6 +143,11 @@ test("MCP server lists tools and calls capabilities plus self-governed actions",
     assert.ok(!tools.tools.some((tool) => tool.name === "laserreach_prepare_messages"));
     const result = await client.callTool({ name: "laserreach_capabilities", arguments: {} });
     assert.match(result.content[0].text, /local_execution/);
+    const parityResult = await client.callTool({
+      name: "list_companies",
+      arguments: { limit: 3 },
+    });
+    assert.match(parityResult.content[0].text, /companies/);
     const sequenceResult = await client.callTool({
       name: "laserreach_create_local_sequence",
       arguments: {
