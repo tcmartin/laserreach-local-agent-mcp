@@ -99,6 +99,7 @@ test("MCP server lists tools and calls capabilities plus self-governed actions",
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_start_sequence"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_launch_campaign_segment"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_send_pipeline_message"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_send_linkedin_message"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_publish_content"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_send_newsletter"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_revoke_self"));

@@ -169,6 +169,9 @@ See [docs/claude-desktop.md](docs/claude-desktop.md) for the full setup.
   `outreach:send`.
 - `laserreach_launch_campaign_segment`: queue a sequence for a selected segment.
 - `laserreach_send_pipeline_message`: send a direct LinkedIn pipeline message.
+- `laserreach_send_linkedin_message`: resolve a profile URL or provider ID to
+  the exact recipient, find the old conversation across inbox pages, and send
+  only to the verified chat. Use `dry_run: true` to preview the match.
 - `laserreach_publish_content`: publish a content calendar item.
 - `laserreach_send_newsletter`: send an account newsletter by email or Slack.
 - `laserreach_sync_hubspot_outreach`: log local-agent outreach to HubSpot. Use `dry_run: true` first.

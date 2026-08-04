@@ -349,6 +349,33 @@ export function registerLaserreachTools(server, client) {
   );
 
   server.registerTool(
+    "laserreach_send_linkedin_message",
+    {
+      title: "Send recipient-bound LinkedIn message",
+      description: "Resolve one LinkedIn recipient, find their exact existing conversation across all inbox pages, and send only to that verified chat. Requires outreach:send. Set require_existing_chat=true when the user asks for an old conversation. A mismatched chat_id is always rejected.",
+      inputSchema: {
+        text: z.string().min(1),
+        confirm_outbound: z.literal(true),
+        linkedin_url: z.string().url().optional(),
+        recipient_provider_id: z.string().min(1).optional(),
+        provider_id: z.string().min(1).optional(),
+        person_id: z.string().min(1).optional(),
+        chat_id: z.string().min(1).optional(),
+        account_id: z.string().min(1).optional(),
+        require_existing_chat: z.boolean().default(true),
+        dry_run: z.boolean().optional(),
+        inmail: z.boolean().optional(),
+      },
+    },
+    async ({ confirm_outbound: _confirm, ...body }) => {
+      if (!body.linkedin_url && !body.recipient_provider_id && !body.provider_id && !body.person_id) {
+        throw new Error("linkedin_url, recipient_provider_id, provider_id, or person_id is required");
+      }
+      return wrap(() => client.sendLinkedinMessage(body));
+    },
+  );
+
+  server.registerTool(
     "laserreach_publish_content",
     {
       title: "Publish content",

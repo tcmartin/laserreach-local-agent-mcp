@@ -130,6 +130,44 @@ test("LaserreachClient syncs local outreach to HubSpot endpoint", async () => {
   }
 });
 
+test("LaserreachClient sends recipient-bound LinkedIn message requests", async () => {
+  const api = await startMockApi(async (req, res) => {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    assert.equal(req.method, "POST");
+    assert.equal(req.url, "/api/abm/linkedin/messages/send");
+    assert.deepEqual(JSON.parse(body), {
+      linkedin_url: "https://www.linkedin.com/in/target-person/",
+      text: "Hello from the verified old thread",
+      require_existing_chat: true,
+      dry_run: true,
+    });
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({
+      success: true,
+      dry_run: true,
+      chat_id: "verified_chat",
+      recipient: { provider_id: "target_provider" },
+    }));
+  });
+  try {
+    const client = new LaserreachClient({
+      apiBase: api.url,
+      orgId: "org_test",
+      token: "tok_test",
+    });
+    const result = await client.sendLinkedinMessage({
+      linkedin_url: "https://www.linkedin.com/in/target-person/",
+      text: "Hello from the verified old thread",
+      require_existing_chat: true,
+      dry_run: true,
+    });
+    assert.equal(result.chat_id, "verified_chat");
+  } finally {
+    await api.close();
+  }
+});
+
 test("LaserreachClient drives the local reply claim, draft, and send endpoints", async () => {
   const requests = [];
   const api = await startMockApi(async (req, res) => {

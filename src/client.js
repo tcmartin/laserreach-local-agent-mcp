@@ -200,6 +200,14 @@ export class LaserreachClient {
     });
   }
 
+  sendLinkedinMessage(body = {}) {
+    return this.request({
+      method: "POST",
+      path: "/api/abm/linkedin/messages/send",
+      body,
+    });
+  }
+
   publishContent(body = {}) {
     return this.request({
       method: "POST",
