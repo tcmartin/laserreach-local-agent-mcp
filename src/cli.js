@@ -5,6 +5,11 @@ import { resolve } from "node:path";
 
 import { LaserreachClient } from "./client.js";
 import { DEFAULT_CONFIG_PATH, loadRunnerConfig } from "./config.js";
+import {
+  assertMutationConfirmed,
+  findManifestTool,
+  selectManifestTools,
+} from "./discovery.js";
 import { runMcpServer } from "./mcp.js";
 import {
   assertReplyEngineReady,
@@ -13,6 +18,7 @@ import {
   runLocalReplyDaemon,
   runLocalReplyOnce,
 } from "./runner.js";
+import { installSkill, skillDistribution } from "./skill.js";
 
 const HELP = `Laserreach local agent helper
 
@@ -21,6 +27,10 @@ Usage:
   laserreach-local-agent serve [--config ./laserreach.local-agent.config.json]
   laserreach-local-agent replies [--engine codex|claude] [--once]
   laserreach-local-agent capabilities
+  laserreach-local-agent tools [--filter TERM] [--schemas]
+  laserreach-local-agent invoke <TOOL> [JSON_ARGS] [--confirm-mutation]
+  laserreach-local-agent install-skill [--target codex|claude|agents|gemini] [--path PATH] [--force]
+  laserreach-local-agent skill-info
   laserreach-local-agent request <METHOD> <PATH> [JSON_BODY]
   laserreach-local-agent init [--path ./laserreach.local-agent.config.json]
   laserreach-local-agent sign <JSON_BODY>
@@ -97,6 +107,41 @@ async function main() {
   }
   if (command === "capabilities") {
     printJson(await new LaserreachClient().capabilities());
+    return;
+  }
+  if (command === "tools") {
+    const manifest = await new LaserreachClient().siteTools({ includeInstructions: false });
+    printJson({
+      registry_version: manifest.registry_version,
+      tools: selectManifestTools(manifest, {
+        filter: argValue(args, "--filter", ""),
+        includeSchemas: args.includes("--schemas"),
+      }),
+    });
+    return;
+  }
+  if (command === "invoke") {
+    const [toolName, argumentsRaw] = args;
+    const toolArgs = argumentsRaw && !argumentsRaw.startsWith("--")
+      ? JSON.parse(argumentsRaw)
+      : {};
+    const client = new LaserreachClient();
+    const manifest = await client.siteTools({ includeInstructions: false });
+    const tool = findManifestTool(manifest, toolName);
+    assertMutationConfirmed(tool, args.includes("--confirm-mutation"));
+    printJson(await client.invokeSiteTool(toolName, toolArgs));
+    return;
+  }
+  if (command === "install-skill") {
+    printJson(await installSkill({
+      target: argValue(args, "--target", "agents"),
+      path: argValue(args, "--path"),
+      force: args.includes("--force"),
+    }));
+    return;
+  }
+  if (command === "skill-info") {
+    printJson(skillDistribution());
     return;
   }
   if (command === "request") {

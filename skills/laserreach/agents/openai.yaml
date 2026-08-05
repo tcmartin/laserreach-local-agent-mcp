@@ -1,0 +1,4 @@
+interface:
+  display_name: "Laserreach External Agent"
+  short_description: "Operate Laserreach safely from any AI agent"
+  default_prompt: "Use $laserreach to inspect my Laserreach workspace and perform the requested governed action."

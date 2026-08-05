@@ -4,6 +4,7 @@ Use Claude Desktop, Codex, or another local agent with Laserreach without handin
 
 This package provides:
 
+- an open-source, credential-neutral AI skill for any skill-aware agent;
 - an MCP stdio server with Laserreach tools for local agents;
 - an automatic LinkedIn reply daemon powered by the user's signed-in Codex or Claude Code;
 - a webhook receiver for Laserreach, HubSpot, Zapier, Make, n8n, and other JSON event sources;
@@ -16,6 +17,27 @@ The default tool surface is built for local execution. It exposes source, signal
 ```bash
 npm install -g github:tcmartin/laserreach-local-agent-mcp
 ```
+
+Install the portable Laserreach skill for your AI client:
+
+```bash
+# Codex
+npx -y github:tcmartin/laserreach-local-agent-mcp install-skill --target codex
+
+# Claude Code
+npx -y github:tcmartin/laserreach-local-agent-mcp install-skill --target claude
+
+# Shared agent skill directory
+npx -y github:tcmartin/laserreach-local-agent-mcp install-skill --target agents
+
+# Gemini CLI
+npx -y github:tcmartin/laserreach-local-agent-mcp install-skill --target gemini
+```
+
+Use `--path /absolute/path/to/laserreach` for another client and `--force` to
+replace an existing installation. The skill contains no account IDs or tokens.
+Agents without a skill loader can read the same instructions directly from
+[`skills/laserreach/SKILL.md`](skills/laserreach/SKILL.md).
 
 For local development from a clone:
 
@@ -49,6 +71,18 @@ Test the connection:
 ```bash
 laserreach-local-agent capabilities
 ```
+
+Discover the live token-scoped tool catalog or invoke a canonical site tool:
+
+```bash
+laserreach-local-agent tools --filter linkedin --schemas
+laserreach-local-agent invoke list_companies '{"limit":10}'
+laserreach-local-agent invoke linkedin_send_message '{"dry_run":true}' --confirm-mutation
+```
+
+The CLI rejects every non-read tool without `--confirm-mutation`. Confirmation
+does not add permissions; the external-agent token and organization policy
+remain authoritative.
 
 ## Automatic LinkedIn Replies With Local Codex Or Claude Code
 
