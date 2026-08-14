@@ -4,8 +4,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Client } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cliPath = resolve(__dirname, "../src/cli.js");
@@ -24,9 +24,11 @@ function startMockApi(handler) {
   });
 }
 
-test("MCP server lists tools and calls capabilities plus self-governed actions", async () => {
+test("MCP 2026 server negotiates modern stdio and lazily invokes live site tools", async () => {
+  let manifestRequests = 0;
   const api = await startMockApi(async (req, res) => {
     if (req.url === "/api/abm/agent/tools?include_instructions=false") {
+      manifestRequests += 1;
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({
         success: true,
@@ -107,6 +109,7 @@ test("MCP server lists tools and calls capabilities plus self-governed actions",
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ local_agent_default: { mode: "local_execution" } }));
   });
+
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [cliPath, "mcp"],
@@ -115,15 +118,25 @@ test("MCP server lists tools and calls capabilities plus self-governed actions",
       LASERREACH_API_BASE: api.url,
       LASERREACH_ORG_ID: "org_test",
       LASERREACH_AGENT_TOKEN: "tok_test",
+      LASERREACH_MCP_TOOL_MODE: "compact",
     },
   });
-  const client = new Client({ name: "laserreach-local-agent-test", version: "0.1.0" });
+  const client = new Client(
+    { name: "laserreach-local-agent-test", version: "0.1.0" },
+    { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+  );
+
   try {
     await client.connect(transport);
+    assert.equal(client.getProtocolEra(), "modern");
+
     const tools = await client.listTools();
+    assert.equal(manifestRequests, 0, "compact startup must not fetch the full catalog");
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_capabilities"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_site_tools_manifest"));
-    assert.ok(tools.tools.some((tool) => tool.name === "list_companies"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_search_site_tools"));
+    assert.ok(tools.tools.some((tool) => tool.name === "laserreach_invoke_site_tool"));
+    assert.ok(!tools.tools.some((tool) => tool.name === "list_companies"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_list_signals"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_assess_signal"));
     assert.ok(tools.tools.some((tool) => tool.name === "laserreach_list_icps"));
@@ -141,13 +154,23 @@ test("MCP server lists tools and calls capabilities plus self-governed actions",
     assert.ok(!tools.tools.some((tool) => tool.name === "laserreach_score_pending_signals"));
     assert.ok(!tools.tools.some((tool) => tool.name === "laserreach_process_signals"));
     assert.ok(!tools.tools.some((tool) => tool.name === "laserreach_prepare_messages"));
-    const result = await client.callTool({ name: "laserreach_capabilities", arguments: {} });
-    assert.match(result.content[0].text, /local_execution/);
+
+    const capabilities = await client.callTool({ name: "laserreach_capabilities", arguments: {} });
+    assert.match(capabilities.content[0].text, /local_execution/);
+
+    const search = await client.callTool({
+      name: "laserreach_search_site_tools",
+      arguments: { query: "companies", include_schemas: true, limit: 3 },
+    });
+    assert.match(search.content[0].text, /list_companies/);
+
     const parityResult = await client.callTool({
-      name: "list_companies",
-      arguments: { limit: 3 },
+      name: "laserreach_invoke_site_tool",
+      arguments: { name: "list_companies", arguments: { limit: 3 } },
     });
     assert.match(parityResult.content[0].text, /companies/);
+    assert.ok(manifestRequests >= 2);
+
     const sequenceResult = await client.callTool({
       name: "laserreach_create_local_sequence",
       arguments: {
@@ -160,6 +183,7 @@ test("MCP server lists tools and calls capabilities plus self-governed actions",
       },
     });
     assert.match(sequenceResult.content[0].text, /seq_local/);
+
     const publishResult = await client.callTool({
       name: "laserreach_publish_content",
       arguments: {
@@ -169,6 +193,7 @@ test("MCP server lists tools and calls capabilities plus self-governed actions",
       },
     });
     assert.match(publishResult.content[0].text, /published/);
+
     const campaignResult = await client.callTool({
       name: "laserreach_launch_campaign_segment",
       arguments: {

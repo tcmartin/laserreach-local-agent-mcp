@@ -39,6 +39,7 @@ Environment:
   LASERREACH_API_BASE       default https://api.laserreach.com
   LASERREACH_ORG_ID         required for API/MCP
   LASERREACH_AGENT_TOKEN    required for API/MCP
+  LASERREACH_MCP_TOOL_MODE   compact (default) or full parity
   LASERREACH_WEBHOOK_SECRET optional HMAC secret for serve/sign
 `;
 

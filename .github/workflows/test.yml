@@ -1,0 +1,41 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Node ${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version:
+          - 20.x
+          - 22.x
+          - 24.x
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - name: Reject legacy monolithic MCP SDK usage
+        run: |
+          if grep -R --line-number --fixed-strings '@modelcontextprotocol/sdk' package.json package-lock.json src test; then
+            echo 'Use the split MCP v2 packages instead of @modelcontextprotocol/sdk.' >&2
+            exit 1
+          fi
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - run: npm pack --dry-run

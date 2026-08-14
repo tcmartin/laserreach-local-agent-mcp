@@ -1,6 +1,6 @@
 {
   "name": "laserreach-local-agent-mcp",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Local MCP, webhook, cron, and self-governed execution helper for Laserreach.",
   "type": "module",
   "license": "MIT",
@@ -26,9 +26,11 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/server": "^2.0.0",
     "node-cron": "^4.2.1",
-    "zod": "^3.25.76"
+    "zod": "^4.2.0"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0"
+  }
 }
