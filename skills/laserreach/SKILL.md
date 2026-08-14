@@ -27,6 +27,10 @@ Prefer the bundled MCP server when the host supports MCP:
 npx -y github:tcmartin/laserreach-local-agent-mcp mcp
 ```
 
+It uses MCP 2026-07-28 with compact tool discovery by default. Do not enable
+`LASERREACH_MCP_TOOL_MODE=full` unless the host genuinely requires every live
+site schema as a top-level tool.
+
 For agents without MCP support, use the same package as a CLI:
 
 ```bash
@@ -39,14 +43,14 @@ Read [references/api.md](references/api.md) when using the CLI or REST API direc
 ## Operating workflow
 
 1. Call `laserreach_capabilities` or `capabilities` to confirm authentication and current features.
-2. Fetch `laserreach_site_tools_manifest` or run `tools` to discover only the tools allowed by the current token.
+2. Use `laserreach_search_site_tools` (or CLI `tools --filter`) for uncommon operations. Request schemas only for the small set of plausible matches.
 3. Read current state before proposing or performing a mutation.
-4. Use canonical site tools for the requested operation. Do not invent endpoints or parameters.
+4. Prefer a stable convenience tool when one exists. Otherwise call `laserreach_invoke_site_tool` with exactly the name and arguments returned by live discovery. Do not invent endpoints or parameters.
 5. Obtain explicit user authorization before outbound communication, campaign launch, publishing, deletion, or another externally visible mutation.
 6. Invoke mutations through MCP or add `--confirm-mutation` to CLI `invoke` calls.
 7. Read the affected resource again and report the verified result. Poll status endpoints when work is asynchronous.
 
-Use `laserreach_invoke_site_tool` only when a canonical dynamic tool is unavailable in the host. Pass exactly the name and arguments returned by the live manifest.
+Use `laserreach_site_tools_manifest` only when you need registry-wide policy metadata; it is intentionally larger than a bounded search result.
 
 ## Recipient-safe LinkedIn messaging
 

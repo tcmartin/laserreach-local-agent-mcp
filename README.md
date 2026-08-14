@@ -5,7 +5,7 @@ Use Claude Desktop, Codex, or another local agent with Laserreach without handin
 This package provides:
 
 - an open-source, credential-neutral AI skill for any skill-aware agent;
-- an MCP stdio server with Laserreach tools for local agents;
+- an MCP 2026-07-28 stdio server with compact, on-demand Laserreach tool discovery;
 - an automatic LinkedIn reply daemon powered by the user's signed-in Codex or Claude Code;
 - a webhook receiver for Laserreach, HubSpot, Zapier, Make, n8n, and other JSON event sources;
 - cron-style scheduled jobs that can call Laserreach APIs and optionally pass results to a local command such as `codex`.
@@ -158,6 +158,19 @@ Start the MCP server:
 laserreach-local-agent mcp
 ```
 
+The default `compact` mode exposes the stable convenience tools plus
+`laserreach_search_site_tools` and `laserreach_invoke_site_tool`. It does
+not fetch or register the complete live site-tool catalog at startup, avoiding
+a large always-on schema payload in the agent context.
+
+Use full top-level parity only for an older client or workflow that requires it:
+
+```bash
+LASERREACH_MCP_TOOL_MODE=full laserreach-local-agent mcp
+```
+
+Both modes use the MCP 2026-07-28 stdio entry and still accept 2025-era clients.
+
 Claude Desktop example:
 
 ```json
@@ -169,7 +182,8 @@ Claude Desktop example:
       "env": {
         "LASERREACH_API_BASE": "https://api.laserreach.com",
         "LASERREACH_ORG_ID": "<org_id>",
-        "LASERREACH_AGENT_TOKEN": "<external_agent_token>"
+        "LASERREACH_AGENT_TOKEN": "<external_agent_token>",
+        "LASERREACH_MCP_TOOL_MODE": "compact"
       }
     }
   }
@@ -180,10 +194,15 @@ See [docs/claude-desktop.md](docs/claude-desktop.md) for the full setup.
 
 ## MCP Tools
 
-At startup the MCP fetches the token-scoped website-agent manifest and
-registers every allowed canonical tool under its exact site name. This removes
-the former hand-maintained parity gap. `laserreach_site_tools_manifest`
-refreshes the manifest metadata. A self-governed token with `*` scope receives
+Compact mode keeps the top-level MCP surface small. Use
+`laserreach_search_site_tools` to retrieve a bounded slice of the live,
+token-scoped website-agent catalog, then call `laserreach_invoke_site_tool`
+with the exact returned name and arguments. The invocation rechecks the current
+manifest before dispatch, so revoked scopes do not linger in a local cache.
+
+Set `LASERREACH_MCP_TOOL_MODE=full` to preserve the previous behavior: the
+server fetches the manifest at startup and registers every allowed canonical
+tool under its exact site name. A self-governed token with `*` scope receives
 every tenant-safe site tool; account governance remains user-managed.
 
 The following `laserreach_*` convenience tools remain available:
@@ -191,6 +210,10 @@ The following `laserreach_*` convenience tools remain available:
 - `laserreach_capabilities`: fetch the live capability catalog.
 - `laserreach_site_tools_manifest`: fetch the authoritative token-scoped site
   tool manifest and policy decisions.
+- `laserreach_search_site_tools`: search a bounded slice of that live catalog,
+  optionally including the matching input schemas.
+- `laserreach_invoke_site_tool`: invoke one exact live-catalog tool after
+  revalidating availability and arguments.
 - `laserreach_list_sources`: list signal sources.
 - `laserreach_collect_source`: collect raw signals without LaserReach-hosted
   scoring. The local agent assesses them with `laserreach_assess_signal`.
@@ -356,6 +379,8 @@ X-Signature: sha256=<hex>
 ## Security Notes
 
 - Keep `LASERREACH_AGENT_TOKEN` in local environment variables or a secret manager.
+- Keep `LASERREACH_MCP_TOOL_MODE=compact` unless top-level parity is genuinely
+  required; `full` increases the schemas every MCP host may inject into context.
 - `serve` refuses to start with webhook handlers unless `LASERREACH_WEBHOOK_SECRET` is set.
 - Do not store tokens in config files.
 - Webhook and cron commands receive a minimal environment. Add command-specific values explicitly in the action's `env` object.
