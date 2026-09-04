@@ -1,6 +1,6 @@
 {
   "name": "laserreach-local-agent-mcp",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Local MCP, webhook, cron, and self-governed execution helper for Laserreach.",
   "type": "module",
   "license": "MIT",

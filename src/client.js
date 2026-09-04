@@ -2,6 +2,24 @@ import { URL } from "node:url";
 
 import { requireLaserreachEnv } from "./config.js";
 
+const RETRYABLE_READ_STATUSES = new Set([408, 425, 429, 502, 503, 504]);
+
+function positiveInteger(value, fallback) {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function nonNegativeInteger(value, fallback) {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function wait(milliseconds) {
+  return milliseconds > 0
+    ? new Promise((resolve) => setTimeout(resolve, milliseconds))
+    : Promise.resolve();
+}
+
 function normalizePath(path) {
   const raw = String(path || "").trim();
   if (!raw) throw new Error("path is required");
@@ -18,6 +36,18 @@ export class LaserreachClient {
     this.orgId = String(options.orgId || env.orgId || "").trim();
     this.token = String(options.token || env.token || "").trim();
     this.fetchImpl = options.fetchImpl || globalThis.fetch;
+    this.requestTimeoutMs = positiveInteger(
+      options.requestTimeoutMs ?? env.requestTimeoutMs,
+      30_000,
+    );
+    this.safeReadMaxAttempts = positiveInteger(
+      options.safeReadMaxAttempts ?? env.safeReadMaxAttempts,
+      2,
+    );
+    this.retryDelayMs = nonNegativeInteger(
+      options.retryDelayMs ?? env.retryDelayMs,
+      250,
+    );
     if (!this.fetchImpl) throw new Error("global fetch is required; use Node.js 20+");
   }
 
@@ -45,22 +75,65 @@ export class LaserreachClient {
       requestHeaders["Content-Type"] = "application/json";
       init.body = JSON.stringify(body);
     }
-    const response = await this.fetchImpl(url, init);
-    const text = await response.text();
-    let data = text;
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch {
-      data = text;
+    const isSafeRead = cleanMethod === "GET" || cleanMethod === "HEAD";
+    const maxAttempts = isSafeRead ? this.safeReadMaxAttempts : 1;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => {
+        controller.abort(new Error("Laserreach request timeout"));
+      }, this.requestTimeoutMs);
+
+      let response;
+      try {
+        response = await this.fetchImpl(url, { ...init, signal: controller.signal });
+      } catch (cause) {
+        const error = controller.signal.aborted
+          ? Object.assign(
+              new Error(`Laserreach API request timed out after ${this.requestTimeoutMs}ms`),
+              {
+                code: "LASERREACH_TIMEOUT",
+                timeoutMs: this.requestTimeoutMs,
+                path: url.toString(),
+                cause,
+              },
+            )
+          : cause;
+        if (isSafeRead && attempt < maxAttempts) {
+          await wait(this.retryDelayMs * attempt);
+          continue;
+        }
+        throw error;
+      } finally {
+        clearTimeout(timer);
+      }
+
+      const text = await response.text();
+      let data = text;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = text;
+      }
+      if (!response.ok) {
+        const err = new Error(`Laserreach API request failed: ${response.status}`);
+        err.status = response.status;
+        err.body = data;
+        err.path = url.toString();
+        if (
+          isSafeRead
+          && attempt < maxAttempts
+          && RETRYABLE_READ_STATUSES.has(response.status)
+        ) {
+          await wait(this.retryDelayMs * attempt);
+          continue;
+        }
+        throw err;
+      }
+      return data;
     }
-    if (!response.ok) {
-      const err = new Error(`Laserreach API request failed: ${response.status}`);
-      err.status = response.status;
-      err.body = data;
-      err.path = url.toString();
-      throw err;
-    }
-    return data;
+
+    throw new Error("Laserreach API request exhausted safe read attempts");
   }
 
   capabilities() {

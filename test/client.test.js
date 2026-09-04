@@ -38,6 +38,102 @@ test("LaserreachClient sends bearer token and org header", async () => {
   }
 });
 
+test("LaserreachClient retries a transient GET transport failure once", async () => {
+  let attempts = 0;
+  const client = new LaserreachClient({
+    apiBase: "https://api.example.test",
+    orgId: "org_test",
+    token: "tok_test",
+    retryDelayMs: 0,
+    fetchImpl: async () => {
+      attempts += 1;
+      if (attempts === 1) throw new TypeError("fetch failed");
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+
+  assert.deepEqual(await client.capabilities(), { success: true });
+  assert.equal(attempts, 2);
+});
+
+test("LaserreachClient never retries a mutation transport failure", async () => {
+  let attempts = 0;
+  const client = new LaserreachClient({
+    apiBase: "https://api.example.test",
+    orgId: "org_test",
+    token: "tok_test",
+    retryDelayMs: 0,
+    fetchImpl: async () => {
+      attempts += 1;
+      throw new TypeError("fetch failed");
+    },
+  });
+
+  await assert.rejects(
+    () => client.invokeSiteTool("create_company", { name: "Example" }),
+    /fetch failed/,
+  );
+  assert.equal(attempts, 1);
+});
+
+test("LaserreachClient retries retryable GET status codes", async () => {
+  let attempts = 0;
+  const client = new LaserreachClient({
+    apiBase: "https://api.example.test",
+    orgId: "org_test",
+    token: "tok_test",
+    retryDelayMs: 0,
+    fetchImpl: async () => {
+      attempts += 1;
+      return attempts === 1
+        ? new Response(JSON.stringify({ error: "temporarily_unavailable" }), { status: 503 })
+        : new Response(JSON.stringify({ success: true }), { status: 200 });
+    },
+  });
+
+  assert.deepEqual(await client.capabilities(), { success: true });
+  assert.equal(attempts, 2);
+});
+
+test("LaserreachClient aborts stalled reads with a bounded timeout", async () => {
+  const client = new LaserreachClient({
+    apiBase: "https://api.example.test",
+    orgId: "org_test",
+    token: "tok_test",
+    requestTimeoutMs: 10,
+    safeReadMaxAttempts: 1,
+    fetchImpl: async (_url, init) => new Promise((_resolve, reject) => {
+      init.signal.addEventListener("abort", () => reject(init.signal.reason), { once: true });
+    }),
+  });
+
+  await assert.rejects(
+    () => client.capabilities(),
+    (error) => error.code === "LASERREACH_TIMEOUT" && error.timeoutMs === 10,
+  );
+});
+
+test("LaserreachClient reads reliability controls from environment", () => {
+  const client = new LaserreachClient({
+    env: {
+      LASERREACH_API_BASE: "https://api.example.test",
+      LASERREACH_ORG_ID: "org_test",
+      LASERREACH_AGENT_TOKEN: "tok_test",
+      LASERREACH_REQUEST_TIMEOUT_MS: "1234",
+      LASERREACH_SAFE_READ_MAX_ATTEMPTS: "3",
+      LASERREACH_RETRY_DELAY_MS: "17",
+    },
+    fetchImpl: async () => new Response("{}", { status: 200 }),
+  });
+
+  assert.equal(client.requestTimeoutMs, 1234);
+  assert.equal(client.safeReadMaxAttempts, 3);
+  assert.equal(client.retryDelayMs, 17);
+});
+
 test("LaserreachClient fetches and invokes the authoritative site tool registry", async () => {
   const requests = [];
   const api = await startMockApi(async (req, res) => {

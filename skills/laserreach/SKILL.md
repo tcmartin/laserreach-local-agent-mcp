@@ -15,6 +15,10 @@ Require these values from the user's own Laserreach external-agent setup:
 export LASERREACH_API_BASE="https://api.laserreach.com"
 export LASERREACH_ORG_ID="<organization-id>"
 export LASERREACH_AGENT_TOKEN="<one-time-token>"
+# Optional: 30s timeout, two total attempts for safe reads, 250ms retry delay.
+export LASERREACH_REQUEST_TIMEOUT_MS="30000"
+export LASERREACH_SAFE_READ_MAX_ATTEMPTS="2"
+export LASERREACH_RETRY_DELAY_MS="250"
 ```
 
 Do not print, commit, transmit elsewhere, or embed the token in a prompt. Prefer the AI client's secret store or process environment. Never use credentials belonging to another organization.

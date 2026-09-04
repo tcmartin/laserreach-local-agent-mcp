@@ -15,6 +15,9 @@ export function getLaserreachEnv(env = process.env) {
     apiBase: cleanApiBase(env.LASERREACH_API_BASE),
     orgId: String(env.LASERREACH_ORG_ID || "").trim(),
     token: String(env.LASERREACH_AGENT_TOKEN || "").trim(),
+    requestTimeoutMs: env.LASERREACH_REQUEST_TIMEOUT_MS,
+    safeReadMaxAttempts: env.LASERREACH_SAFE_READ_MAX_ATTEMPTS,
+    retryDelayMs: env.LASERREACH_RETRY_DELAY_MS,
   };
 }
 

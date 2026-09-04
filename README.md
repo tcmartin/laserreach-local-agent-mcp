@@ -64,6 +64,10 @@ Set these environment variables:
 export LASERREACH_API_BASE="https://api.laserreach.com"
 export LASERREACH_ORG_ID="<org_id>"
 export LASERREACH_AGENT_TOKEN="<external_agent_token>"
+# Optional reliability controls (defaults shown)
+export LASERREACH_REQUEST_TIMEOUT_MS="30000"
+export LASERREACH_SAFE_READ_MAX_ATTEMPTS="2"
+export LASERREACH_RETRY_DELAY_MS="250"
 ```
 
 Test the connection:
@@ -141,6 +145,11 @@ Laserreach enforces these checks after the local process returns text:
 - the send reservation has not already been used.
 
 Queue admission is capped before Codex or Claude Code runs. A local command failure cancels that job instead of retrying and consuming another local model call. An ambiguous provider failure is not retried automatically, which prevents duplicate LinkedIn messages.
+
+API requests have a bounded timeout. GET and HEAD requests retry once after a
+transport failure or a retryable HTTP status (`408`, `425`, `429`, `502`, `503`,
+or `504`). Mutations are attempted exactly once and are never retried
+automatically.
 
 Test one poll without leaving a daemon running:
 
