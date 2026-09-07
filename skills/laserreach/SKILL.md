@@ -42,11 +42,13 @@ Read [references/api.md](references/api.md) when using the CLI or REST API direc
 
 ## Operating workflow
 
+For a recurring acquisition program, read [references/gtm-playbook.md](references/gtm-playbook.md). It covers website-first research, exact agent-authored sequences, connection acceptance, capacity, content, revenue measurement, and daily recovery. Use the customer's own offers, account identities, limits, and existing authorization.
+
 1. Call `laserreach_capabilities` or `capabilities` to confirm authentication and current features.
 2. Fetch `laserreach_site_tools_manifest` or run `tools` to discover only the tools allowed by the current token.
 3. Read current state before proposing or performing a mutation.
 4. Use canonical site tools for the requested operation. Do not invent endpoints or parameters.
-5. Obtain explicit user authorization before outbound communication, campaign launch, publishing, deletion, or another externally visible mutation.
+5. Confirm that outbound communication, campaign launch, publishing, deletion, or another externally visible mutation is within the user's authorization. Existing authorization persists within its stated scope; do not ask again for each action in an authorized program.
 6. Invoke mutations through MCP or add `--confirm-mutation` to CLI `invoke` calls.
 7. Read the affected resource again and report the verified result. Poll status endpoints when work is asynchronous.
 
