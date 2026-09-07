@@ -29,6 +29,29 @@ laserreach-local-agent invoke <mutating-tool> '{...}' --confirm-mutation
 
 Mutation access is declared in each tool's `x-laserreach-access` field. The CLI rejects mutation invocations unless `--confirm-mutation` is present.
 
+## LinkedIn enrollment preflight
+
+When the deployment exposes it, `GET /api/abm/linkedin/preflight` accepts
+`account_id`, `person_id`, `linkedin_url`, and `recipient_provider_id` as query
+parameters. Supply all four exact identifiers. Use the authentication headers
+above; discover a matching named tool first, otherwise use this direct REST read.
+This read neither sends nor enrolls a recipient.
+
+`include_pending_invitations=true` requests a bounded read of sent and received
+pending invitations. Omit it when fresh cached evidence already answers that
+question. A missing invitation is known absent only when both inventories are
+exhausted. Provider errors, malformed results, pagination caps, and incomplete
+inventories mean unknown, not permission to connect. Historical invitation
+outcomes are not a complete prior-contact audit.
+
+Inspect identity, relationship, manual-contact, suppression, and `connection_action`
+separately. A confirmed existing connection can skip the invitation. The response
+deliberately retains `clear_for_enrollment=false`: duplicate outreach, prior
+conversations, sender policy, authorization, and scheduling remain separate checks.
+Do not equate `checked_gates_passed=true` with authorization to launch. Fail closed
+if required evidence is unknown or identifiers disagree. Cache the evidence and
+observation time instead of repeating provider reads during the same review.
+
 ## Recipient-bound LinkedIn send
 
 The MCP convenience tool `laserreach_send_linkedin_message` and REST endpoint `POST /api/abm/linkedin/messages/send` support these identity guards:

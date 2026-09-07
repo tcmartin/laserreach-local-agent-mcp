@@ -26,6 +26,12 @@ Create a paused sequence/campaign, inspect every recipient and exact template, r
 
 Use the selected account and exact provider recipient. Read the existing conversation before enrollment. For unconnected prospects use `li_connect -> await_accept -> li_message`, with `enforce_connection_gate=true`, acceptance-step `delay_minutes=0`, and first-message `delay_minutes=0` when prompt follow-up is requested. Skip the invitation only when the provider confirms an existing connection. Never bypass acceptance to send an unsolicited first sequence message.
 
+Use the [recipient preflight read](api.md#linkedin-enrollment-preflight) when
+available. It verifies selected gates, not complete enrollment eligibility.
+Reconcile prior outreach, conversations, and sender policy separately. Preserve
+unknown states and bounded-read evidence; do not interpret an incomplete
+invitation inventory as permission to send another invitation.
+
 Stage the full copy before connection outreach. Acceptance should release the first eligible message through the production webhook/worker. A daily research wake cannot guarantee same-hour delivery. Verify deployed acceptance handling and bounded fallback recovery before promising latency. Record acceptance observation, eligible due time, accepted message time, provider ID, and any business-hour, holiday, reply, or rate-limit deferral. Preserve manual stops and suppression. Read back the correct conversation to verify exact text and uniqueness after sending.
 
 ### Email cadence and capacity
@@ -59,6 +65,12 @@ Use a date marker and durable checkpoints per customer timezone. Reconcile conve
 Record discovered companies, researched people, verified contacts, drafted messages, valid enrollments, scheduled steps, accepted sends, and deliveries as separate counts. A completed run needs evidence for each required stage or an explicit unresolved blocker. Never count an empty first page as an exhausted inventory: honor cursors and filter after retrieval where required.
 
 After a timeout, inspect exact resource IDs and persisted state before retrying a mutation. Use idempotency where supported and serialize production mutations. Cache bounded provider reads. Record run ID, checkpoint, errors, attempted recovery, next action, and source-of-truth IDs. Keep credentials and private customer records out of shared playbooks.
+
+A failed enrollment can leave a campaign without a persisted pipeline. Reconcile
+the exact campaign and pipeline state before retrying; preserve or cancel the
+failed shell through supported operations. A campaign target count is not proof
+of a pipeline or a send. Fix serialization or scheduling errors at their source
+rather than changing the requested acceptance cadence to bypass a failure.
 
 ### Reply-runner credential changes
 
