@@ -59,3 +59,11 @@ Use a date marker and durable checkpoints per customer timezone. Reconcile conve
 Record discovered companies, researched people, verified contacts, drafted messages, valid enrollments, scheduled steps, accepted sends, and deliveries as separate counts. A completed run needs evidence for each required stage or an explicit unresolved blocker. Never count an empty first page as an exhausted inventory: honor cursors and filter after retrieval where required.
 
 After a timeout, inspect exact resource IDs and persisted state before retrying a mutation. Use idempotency where supported and serialize production mutations. Cache bounded provider reads. Record run ID, checkpoint, errors, attempted recovery, next action, and source-of-truth IDs. Keep credentials and private customer records out of shared playbooks.
+
+### Reply-runner credential changes
+
+Local reply jobs belong to a runner token, not just an organization. A replacement token with the same scopes does not inherit the old token's queued jobs. An empty successful queue read after a credential change is not proof that the organization has no unanswered messages.
+
+Before replacing a reply-runner credential, compare the active token ID, the configured local runner ID, and the existing job ownership. Preserve the original credential securely until its admitted jobs are reconciled through supported operations. Owner-managed changes to the configured runner affect future inbound jobs; they do not migrate existing jobs. Revoking the configured token can disable local replies.
+
+Discover the current API before recovery. If it offers no authorized reassignment operation, do not manufacture new inbound jobs, edit database ownership, or bypass the governed send route. Record the ownership gap separately from missing scopes and unhandled conversations. Use the original valid runner for its jobs, or request an owner-supported migration. Adding local-reply scopes does not authorize hosted AI, change send limits, or override a holiday hold.
