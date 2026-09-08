@@ -20,6 +20,14 @@ Each candidate needs current person/company/role evidence, source URL and observ
 
 Write complete recipient-specific copy from inspected evidence. Explain the relevant observation, a plausible consequence without pretending certainty, and a useful next step. Each follow-up should add information. Use a small question or relevant artifact before asking for a large commitment. Avoid invented familiarity, unsupported ROI, generic congratulations, and unverified claims.
 
+### Outbound text-hygiene gate
+
+Before persisting or sending any email, LinkedIn message, reply, or other recipient-facing outreach, run the configured deterministic Unicode provenance cleaner over the exact subject and body. Use artifact-only cleanup: invisible Unicode and covert carrier removal with space normalization, NFKC, aggressive homoglyph replacement, emoji-glue removal, bidi stripping, and statistical rewriting disabled. Never use a paraphrasing or model-backed watermark-removal pass for outreach.
+
+Inspect before cleaning. If the output differs, retain the before/after hashes and a character-level diff. Reject the change when it alters a recipient or company name, URL, email address, number, claim, quotation, evidence citation, template field, opt-out text, postal address, or other compliance language. Persist a new copy version after an accepted change. Run the deterministic cleaner again after personalization or template rendering and verify the provider-bound text when that read is available.
+
+Treat an unavailable cleaner, partial scan, or unexplained diff as a hard pre-send failure. A zero-change result is valid and should be recorded; do not rewrite clean copy merely to produce a change. This gate does not authorize removing disclosures or disguising authorship, and it does not replace `use_ai=false` or exact-copy readback.
+
 Create a paused sequence/campaign, inspect every recipient and exact template, run available no-send validation, then launch within existing user authorization. Discover live schemas before calls. Verify campaigns, pipelines, actual scheduled times, sender assignment, and provider objects independently. A queued pipeline is not a sent message; provider acceptance is not verified delivery.
 
 ### LinkedIn acceptance
