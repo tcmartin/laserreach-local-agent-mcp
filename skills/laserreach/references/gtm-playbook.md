@@ -30,6 +30,14 @@ Treat an unavailable cleaner, partial scan, or unexplained diff as a hard pre-se
 
 Create a paused sequence/campaign, inspect every recipient and exact template, run available no-send validation, then launch within existing user authorization. Discover live schemas before calls. Verify campaigns, pipelines, actual scheduled times, sender assignment, and provider objects independently. A queued pipeline is not a sent message; provider acceptance is not verified delivery.
 
+### Inbound reply ownership
+
+When the customer selects a local external reply runner, that runner owns research and wording for email, LinkedIn, SMS, and WhatsApp. Disable hosted reply generation for each selected channel. Claim inbound work before prospecting, content, or new enrollment. The application may provide the verified webhook payload, deterministic context, policy gates, transport, and audit record; it must not call its hosted AI as a fallback when local admission or generation fails.
+
+Before sending, reconcile exact identity, latest thread state, manual-contact markers, opt-outs, suppression, policy, and transport health. Re-read LinkedIn at the provider. For email and phone messaging, require immutable verified-webhook message and thread identifiers. Cancel work that is stale or already handled. Standard phone-message opt-out keywords never receive a reply. Escalate identity ambiguity, legal/payment disputes, abuse complaints, suspicious links or attachments, unverified pricing, and custom commitments. Otherwise, a customer may grant standing authority for truthful routine replies through the governed send route.
+
+Book a meeting only after the recipient agrees to meet or offers specific times. Read the designated calendar's busy windows, create one invitation with the recipient and conference link, verify the event readback, and record the calendar event ID as attribution evidence. Do not create speculative prospect holds.
+
 ### LinkedIn acceptance
 
 Use the selected account and exact provider recipient. Read the existing conversation before enrollment. For unconnected prospects use `li_connect -> await_accept -> li_message`, with `enforce_connection_gate=true`, acceptance-step `delay_minutes=0`, and first-message `delay_minutes=0` when prompt follow-up is requested. Skip the invitation only when the provider confirms an existing connection. Never bypass acceptance to send an unsolicited first sequence message.
@@ -49,6 +57,12 @@ Use the customer's authorized healthy capacity and actual mailbox caps. Follow-u
 Sequence delays are relative to the preceding step. Absolute D0/D1/D3/D7/D14 requires deltas 0/1/2/4/7 days. Verify actual pipeline timestamps, recipient business hours, and holidays. Shift downstream work consistently when rescheduling; do not compress steps or exceed caps. Stop on reply, opt-out, hard bounce, complaint, disqualification, or suppression. Recheck reply state immediately before execution.
 
 Maintain enough researched companies and validated contacts to fill the authorized schedule. Derive reservoir size from actual new-lead demand and follow-up load, not a universal quota. Record unused capacity and its reason. Never weaken recipient quality or exceed limits to fill a target.
+
+### Deliverability evidence
+
+Read event-level deliverability, fleet health, and incidents daily for every active sending workspace. Include attempts, provider-visible deliveries, bounces, deferrals, complaints, unsubscribes, replies, authentication failures, throttles, pauses, blacklist evidence, freshness, and per-domain/per-mailbox rows. Keep denominators explicit. Missing provider events mean telemetry is unavailable; they do not prove zero problems, successful delivery, or inbox placement. SMTP acceptance is `sent`, never `delivered`.
+
+When nominal fleet capacity conflicts with the customer's authorized campaign limit or actual mailbox cap, use the lower verified value and log the mismatch. Never route around a sender-health, external-recipient, suppression, or compliance gate to fill a quota.
 
 ## Content and discussion
 
@@ -86,4 +100,4 @@ Local reply jobs belong to a runner token, not just an organization. A replaceme
 
 Before replacing a reply-runner credential, compare the active token ID, the configured local runner ID, and the existing job ownership. Preserve the original credential securely until its admitted jobs are reconciled through supported operations. Owner-managed changes to the configured runner affect future inbound jobs; they do not migrate existing jobs. Revoking the configured token can disable local replies.
 
-Discover the current API before recovery. If it offers no authorized reassignment operation, do not manufacture new inbound jobs, edit database ownership, or bypass the governed send route. Record the ownership gap separately from missing scopes and unhandled conversations. Use the original valid runner for its jobs, or request an owner-supported migration. Adding local-reply scopes does not authorize hosted AI, change send limits, or override a holiday hold.
+Discover the current API before recovery. When a governed policy-adoption/reassignment operation is available, call it from the newly selected external runner and verify that hosted generation is disabled for every selected channel. It may migrate only queued work and claims whose lease has expired; never steal an active lease or move terminal/unrelated jobs. If no authorized reassignment operation exists, do not manufacture new inbound jobs, edit database ownership, or bypass the governed send route. Record the ownership gap separately from missing scopes and unhandled conversations. Use the original valid runner for its jobs, or request an owner-supported migration. Adding local-reply scopes does not authorize hosted AI, change send limits, or override a holiday hold.
